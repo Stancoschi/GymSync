@@ -1,6 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ReactionButton } from "@/components/feed/reaction-button";
+import { CommentForm } from "@/components/feed/comment-form";
+
+type FeedComment = {
+  id: string;
+  content: string;
+  created_at: string;
+  author_name: string;
+  author_username: string | null;
+};
 
 type FeedItem =
   | {
@@ -11,6 +21,9 @@ type FeedItem =
       actor_username: string | null;
       title: string;
       subtitle: string;
+      reaction_count: number;
+      reacted_by_me: boolean;
+      comments: FeedComment[];
     }
   | {
       id: string;
@@ -20,6 +33,9 @@ type FeedItem =
       actor_username: string | null;
       title: string;
       subtitle: string;
+      reaction_count: number;
+      reacted_by_me: boolean;
+      comments: FeedComment[];
     };
 
 export default async function FeedPage() {
@@ -133,6 +149,120 @@ export default async function FeedPage() {
     );
   }
 
+  const workoutIds = (workouts ?? []).map((w: any) => w.id);
+  const sessionIds = (sessions ?? []).map((s: any) => s.id);
+
+  const { data: workoutReactions } =
+    workoutIds.length > 0
+      ? await supabase
+          .from("workout_reactions")
+          .select("id, workout_id, user_id, reaction_type")
+          .in("workout_id", workoutIds)
+      : { data: [] };
+
+  const { data: sessionReactions } =
+    sessionIds.length > 0
+      ? await supabase
+          .from("session_reactions")
+          .select("id, session_id, user_id, reaction_type")
+          .in("session_id", sessionIds)
+      : { data: [] };
+
+  const { data: workoutComments } =
+    workoutIds.length > 0
+      ? await supabase
+          .from("workout_comments")
+          .select("id, workout_id, user_id, content, created_at")
+          .in("workout_id", workoutIds)
+          .order("created_at", { ascending: true })
+      : { data: [] };
+
+  const { data: sessionComments } =
+    sessionIds.length > 0
+      ? await supabase
+          .from("session_comments")
+          .select("id, session_id, user_id, content, created_at")
+          .in("session_id", sessionIds)
+          .order("created_at", { ascending: true })
+      : { data: [] };
+
+  const commentAuthorIds = Array.from(
+    new Set([
+      ...(workoutComments ?? []).map((c: any) => c.user_id),
+      ...(sessionComments ?? []).map((c: any) => c.user_id),
+    ])
+  );
+
+  const { data: commentAuthors } =
+    commentAuthorIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, username, full_name")
+          .in("id", commentAuthorIds)
+      : { data: [] };
+
+  const commentAuthorMap = new Map(
+    (commentAuthors ?? []).map((author: any) => [author.id, author])
+  );
+
+  const workoutReactionCountMap = new Map<string, number>();
+  const workoutReactedByMeSet = new Set<string>();
+
+  for (const reaction of workoutReactions ?? []) {
+    const key = (reaction as any).workout_id;
+    workoutReactionCountMap.set(key, (workoutReactionCountMap.get(key) ?? 0) + 1);
+
+    if ((reaction as any).user_id === user.id) {
+      workoutReactedByMeSet.add(key);
+    }
+  }
+
+  const sessionReactionCountMap = new Map<string, number>();
+  const sessionReactedByMeSet = new Set<string>();
+
+  for (const reaction of sessionReactions ?? []) {
+    const key = (reaction as any).session_id;
+    sessionReactionCountMap.set(key, (sessionReactionCountMap.get(key) ?? 0) + 1);
+
+    if ((reaction as any).user_id === user.id) {
+      sessionReactedByMeSet.add(key);
+    }
+  }
+
+  const workoutCommentsMap = new Map<string, FeedComment[]>();
+
+  for (const comment of workoutComments ?? []) {
+    const key = (comment as any).workout_id;
+    const author = commentAuthorMap.get((comment as any).user_id);
+
+    const item: FeedComment = {
+      id: (comment as any).id,
+      content: (comment as any).content,
+      created_at: (comment as any).created_at,
+      author_name: author?.full_name || author?.username || "Unknown user",
+      author_username: author?.username || null,
+    };
+
+    workoutCommentsMap.set(key, [...(workoutCommentsMap.get(key) ?? []), item]);
+  }
+
+  const sessionCommentsMap = new Map<string, FeedComment[]>();
+
+  for (const comment of sessionComments ?? []) {
+    const key = (comment as any).session_id;
+    const author = commentAuthorMap.get((comment as any).user_id);
+
+    const item: FeedComment = {
+      id: (comment as any).id,
+      content: (comment as any).content,
+      created_at: (comment as any).created_at,
+      author_name: author?.full_name || author?.username || "Unknown user",
+      author_username: author?.username || null,
+    };
+
+    sessionCommentsMap.set(key, [...(sessionCommentsMap.get(key) ?? []), item]);
+  }
+
   const workoutItems: FeedItem[] = (workouts ?? []).map((workout: any) => {
     const actor = profileMap.get(workout.user_id);
 
@@ -146,6 +276,9 @@ export default async function FeedPage() {
       subtitle: `${workout.title} • ${workout.workout_date}${
         workout.duration_minutes ? ` • ${workout.duration_minutes} min` : ""
       }`,
+      reaction_count: workoutReactionCountMap.get(workout.id) ?? 0,
+      reacted_by_me: workoutReactedByMeSet.has(workout.id),
+      comments: workoutCommentsMap.get(workout.id) ?? [],
     };
   });
 
@@ -162,6 +295,9 @@ export default async function FeedPage() {
       subtitle: `${session.title} • ${session.gyms?.name || "Gym"}${
         session.gyms?.city ? ` • ${session.gyms.city}` : ""
       } • ${new Date(session.scheduled_for).toLocaleString()}`,
+      reaction_count: sessionReactionCountMap.get(session.id) ?? 0,
+      reacted_by_me: sessionReactedByMeSet.has(session.id),
+      comments: sessionCommentsMap.get(session.id) ?? [],
     };
   });
 
@@ -202,6 +338,38 @@ export default async function FeedPage() {
                   <span className="text-xs rounded-md bg-muted px-2 py-1">
                     {item.type}
                   </span>
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <ReactionButton
+                    itemType={item.type}
+                    itemId={item.id}
+                    count={item.reaction_count}
+                    reacted={item.reacted_by_me}
+                  />
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <CommentForm itemType={item.type} itemId={item.id} />
+
+                  {item.comments.length > 0 ? (
+                    <div className="space-y-2">
+                      {item.comments.map((comment) => (
+                        <div key={comment.id} className="rounded-xl bg-muted/40 px-3 py-2">
+                          <p className="text-sm font-medium">
+                            {comment.author_username
+                              ? `@${comment.author_username}`
+                              : comment.author_name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {comment.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No comments yet.</p>
+                  )}
                 </div>
               </div>
             ))}
