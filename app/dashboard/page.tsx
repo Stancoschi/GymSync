@@ -7,6 +7,87 @@ function startOfLast7Days() {
   date.setDate(date.getDate() - 7);
   return date.toISOString().split("T")[0];
 }
+function getGoalLabel(goal: string | null | undefined) {
+  switch (goal) {
+    case "lose_weight":
+      return "Lose weight";
+    case "maintain_weight":
+      return "Maintain";
+    case "gain_muscle":
+      return "Gain muscle";
+    default:
+      return "Not set";
+  }
+}
+
+function getGoalProgressPercent(
+  currentWeight: number | null,
+  targetWeight: number | null,
+  goal: string | null
+) {
+  if (!currentWeight || !targetWeight || !goal) return null;
+
+  if (goal === "maintain_weight") {
+    const diff = Math.abs(currentWeight - targetWeight);
+    return Math.max(0, Math.min(100, 100 - diff * 20));
+  }
+
+  if (goal === "lose_weight") {
+    if (currentWeight <= targetWeight) return 100;
+    const distance = currentWeight - targetWeight;
+    return Math.max(0, Math.min(100, 100 - distance * 10));
+  }
+
+  if (goal === "gain_muscle") {
+    if (currentWeight >= targetWeight) return 100;
+    const distance = targetWeight - currentWeight;
+    return Math.max(0, Math.min(100, 100 - distance * 10));
+  }
+
+  return null;
+}
+
+function getAdherencePercent(
+  completedWorkouts: number,
+  targetWorkouts: number | null | undefined
+) {
+  if (!targetWorkouts || targetWorkouts <= 0) return null;
+  return Math.min(100, Math.round((completedWorkouts / targetWorkouts) * 100));
+}
+
+function getCoachMessage({
+  goal,
+  experienceLevel,
+  recentWorkoutsCount,
+  targetPerWeek,
+}: {
+  goal: string | null;
+  experienceLevel: string | null;
+  recentWorkoutsCount: number;
+  targetPerWeek: number | null | undefined;
+}) {
+  if (!goal) {
+    return "Complete your profile goals to unlock more personalized insights.";
+  }
+
+  if (targetPerWeek && recentWorkoutsCount < targetPerWeek) {
+    return `You are ${targetPerWeek - recentWorkoutsCount} workout(s) away from your weekly target.`;
+  }
+
+  if (goal === "gain_muscle" && experienceLevel === "beginner") {
+    return "Focus on consistent training, progressive overload, and enough food to support growth.";
+  }
+
+  if (goal === "lose_weight") {
+    return "Consistency beats intensity. Keep your training regular and monitor your nutrition trend.";
+  }
+
+  if (goal === "maintain_weight") {
+    return "You are in maintenance mode. Aim for stable habits and steady training frequency.";
+  }
+
+  return "You are on track. Keep building consistency this week.";
+}
 
 function getWeekKey(dateString: string) {
   const date = new Date(dateString);
@@ -52,10 +133,11 @@ export default async function DashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
+  
   if (!user) {
     redirect("/auth/login");
   }
+  
 
   const last7Days = startOfLast7Days();
 
@@ -75,7 +157,17 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("username, full_name, goal")
+      .select(`
+        username,
+        full_name,
+        goal,
+        onboarding_completed,
+        activity_level,
+        training_days_per_week,
+        experience_level,
+        preferred_gym_id,
+        target_weight_kg
+      `)
       .eq("id", user.id)
       .single(),
 
@@ -175,7 +267,13 @@ export default async function DashboardPage() {
   const recentSessions = recentSessionsResult.data ?? [];
   const allWorkoutsForStreak = allWorkoutsForStreakResult.data ?? [];
   const performanceSets = performanceSetsResult.data ?? [];
-
+  const preferredGymResult = profile?.preferred_gym_id
+  ? await supabase
+      .from("gyms")
+      .select("id, name, city")
+      .eq("id", profile.preferred_gym_id)
+      .maybeSingle()
+  : { data: null };
   const workoutWeekStreak = calculateWorkoutWeekStreak(allWorkoutsForStreak);
 
   const prMap = new Map<string, {
@@ -185,7 +283,9 @@ export default async function DashboardPage() {
     estimated1RM: number;
     workoutDate: string;
   }>();
-
+  if (profile && !profile.onboarding_completed) {
+    redirect("/onboarding");
+  }
   for (const set of performanceSets as any[]) {
     const exerciseName = set.workout_exercises?.exercises?.name;
     const workoutDate = set.workout_exercises?.workouts?.workout_date;
@@ -211,6 +311,29 @@ export default async function DashboardPage() {
   const prHighlights = Array.from(prMap.values())
     .sort((a, b) => b.estimated1RM - a.estimated1RM)
     .slice(0, 5);
+
+    const preferredGym = preferredGymResult.data;
+    const currentWeightValue = latestWeight?.weight_kg ? Number(latestWeight.weight_kg) : null;
+    const targetWeightValue = profile?.target_weight_kg ? Number(profile.target_weight_kg) : null;
+    
+    const goalProgressPercent = getGoalProgressPercent(
+      currentWeightValue,
+      targetWeightValue,
+      profile?.goal ?? null
+    );
+    
+    const adherencePercent = getAdherencePercent(
+      recentWorkoutsCount,
+      profile?.training_days_per_week
+    );
+    
+    const coachMessage = getCoachMessage({
+      goal: profile?.goal ?? null,
+      experienceLevel: profile?.experience_level ?? null,
+      recentWorkoutsCount,
+      targetPerWeek: profile?.training_days_per_week,
+    });
+
 
   return (
     <main className="p-6 space-y-8">
@@ -407,6 +530,91 @@ export default async function DashboardPage() {
             <p className="text-sm text-muted-foreground">No sessions yet.</p>
           )}
         </div>
+
+        <section className="grid gap-6 xl:grid-cols-3">
+  <div className="rounded-2xl border p-5 space-y-3">
+    <div className="flex items-center justify-between">
+      <h2 className="text-lg font-semibold">Goal progress</h2>
+      <span className="text-xs rounded-md bg-muted px-2 py-1">
+        {getGoalLabel(profile?.goal)}
+      </span>
+    </div>
+
+    <p className="text-sm text-muted-foreground">
+      {currentWeightValue && targetWeightValue
+        ? `Current: ${currentWeightValue} kg • Target: ${targetWeightValue} kg`
+        : "Add your current and target weight to unlock progress tracking."}
+    </p>
+
+    <div className="h-3 rounded-full bg-muted overflow-hidden">
+      <div
+        className="h-full rounded-full bg-black transition-all"
+        style={{ width: `${goalProgressPercent ?? 0}%` }}
+      />
+    </div>
+
+    <p className="text-sm font-medium">
+      {goalProgressPercent !== null
+        ? `${goalProgressPercent}% toward your goal`
+        : "Progress not available yet"}
+    </p>
+  </div>
+
+  <div className="rounded-2xl border p-5 space-y-3">
+    <div className="flex items-center justify-between">
+      <h2 className="text-lg font-semibold">Weekly adherence</h2>
+      <span className="text-xs rounded-md bg-muted px-2 py-1">
+        {profile?.training_days_per_week ?? "-"} days target
+      </span>
+    </div>
+
+    <p className="text-sm text-muted-foreground">
+      {profile?.training_days_per_week
+        ? `${recentWorkoutsCount} of ${profile.training_days_per_week} planned sessions completed in the last 7 days`
+        : "Set your weekly training target in onboarding."}
+    </p>
+
+    <div className="h-3 rounded-full bg-muted overflow-hidden">
+      <div
+        className="h-full rounded-full bg-black transition-all"
+        style={{ width: `${adherencePercent ?? 0}%` }}
+      />
+    </div>
+
+    <p className="text-sm font-medium">
+      {adherencePercent !== null
+        ? `${adherencePercent}% target adherence`
+        : "Adherence not available yet"}
+    </p>
+  </div>
+
+  <div className="rounded-2xl border p-5 space-y-3">
+    <div className="flex items-center justify-between">
+      <h2 className="text-lg font-semibold">Coach note</h2>
+      <span className="text-xs rounded-md bg-muted px-2 py-1">
+        {profile?.experience_level ?? "general"}
+      </span>
+    </div>
+
+    <p className="text-sm text-muted-foreground">{coachMessage}</p>
+
+    {preferredGym ? (
+      <div className="rounded-xl bg-muted/40 p-3">
+        <p className="font-medium">{preferredGym.name}</p>
+        <p className="text-sm text-muted-foreground">
+          {preferredGym.city || "Preferred gym selected"}
+        </p>
+      </div>
+    ) : (
+      <div className="rounded-xl bg-muted/40 p-3">
+        <p className="font-medium">No preferred gym yet</p>
+        <p className="text-sm text-muted-foreground">
+          Add one in onboarding or profile settings.
+        </p>
+      </div>
+    )}
+  </div>
+</section>
       </section>
 
       <section className="rounded-2xl border p-5">
@@ -429,6 +637,9 @@ export default async function DashboardPage() {
 </Link>
 <Link href="/feed" className="rounded-md border px-4 py-2">
   Feed
+</Link>
+<Link href="/settings/profile" className="rounded-md border px-4 py-2">
+  Settings
 </Link>
         </div>
       </section>

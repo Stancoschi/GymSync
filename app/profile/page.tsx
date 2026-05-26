@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "@/components/profile/profile-form";
+import Link from "next/link";
 
 export default async function ProfilePage({
   searchParams,
@@ -41,6 +42,9 @@ export default async function ProfilePage({
         <p className="text-sm text-muted-foreground">
           Manage your public and personal details.
         </p>
+        <Link href="/settings" className="rounded-md border px-4 py-2"> 
+        Settings
+        </Link>
       </div>
 
       {params?.message ? (
@@ -48,7 +52,7 @@ export default async function ProfilePage({
           {params.message}
         </p>
       ) : null}
-
+  
       <ProfileForm
         email={user.email ?? ""}
         profile={{
@@ -61,4 +65,5 @@ export default async function ProfilePage({
       />
     </main>
   );
+  
 }
