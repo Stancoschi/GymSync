@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
+// ─── Reactions ────────────────────────────────────────────────────────────
+
 export async function toggleWorkoutReaction(formData: FormData) {
   const supabase = await createClient();
 
@@ -68,8 +70,72 @@ export async function toggleSessionReaction(formData: FormData) {
       reaction_type: "fire",
     });
   }
-  
 
   revalidatePath("/feed");
-  
+}
+
+// ─── Comments ────────────────────────────────────────────────────────────
+
+export async function addWorkoutComment(formData: FormData) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  const workoutId = formData.get("workout_id") as string;
+  const content = (formData.get("content") as string)?.trim();
+
+  if (!content) {
+    redirect("/feed");
+  }
+
+  const { error } = await supabase.from("workout_comments").insert({
+    workout_id: workoutId,
+    user_id: user.id,
+    content,
+  });
+
+  if (error) {
+    redirect(`/feed?message=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/feed");
+  redirect("/feed");
+}
+
+export async function addSessionComment(formData: FormData) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  const sessionId = formData.get("session_id") as string;
+  const content = (formData.get("content") as string)?.trim();
+
+  if (!content) {
+    redirect("/feed");
+  }
+
+  const { error } = await supabase.from("session_comments").insert({
+    session_id: sessionId,
+    user_id: user.id,
+    content,
+  });
+
+  if (error) {
+    redirect(`/feed?message=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/feed");
+  redirect("/feed");
 }
