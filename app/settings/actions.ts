@@ -4,50 +4,51 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export async function updateProfileSettings(formData: FormData) {
+export async function updatePassword(formData: FormData) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const newPassword = formData.get("new_password") as string;
+  const confirmPassword = formData.get("confirm_password") as string;
 
-  if (!user) {
-    redirect("/auth/login");
+  if (!newPassword || newPassword.length < 8) {
+    redirect("/settings?message=Password must be at least 8 characters");
   }
 
-  const goal = formData.get("goal") as string;
-  const height_cm = formData.get("height_cm") as string;
-  const body_fat_percent = formData.get("body_fat_percent") as string;
-  const target_weight_kg = formData.get("target_weight_kg") as string;
-  const activity_level = formData.get("activity_level") as string;
-  const training_days_per_week = formData.get("training_days_per_week") as string;
-  const experience_level = formData.get("experience_level") as string;
-  const preferred_gym_id = formData.get("preferred_gym_id") as string;
+  if (newPassword !== confirmPassword) {
+    redirect("/settings?message=Passwords do not match");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+  if (error) redirect(`/settings?message=${encodeURIComponent(error.message)}`);
+
+  redirect("/settings?message=Password updated successfully");
+}
+
+export async function updateProfile(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
+
+  const goal = formData.get("goal") as string | null;
+  const height_cm = formData.get("height_cm") ? Number(formData.get("height_cm")) : null;
+  const body_fat_percent = formData.get("body_fat_percent") ? Number(formData.get("body_fat_percent")) : null;
+  const target_weight_kg = formData.get("target_weight_kg") ? Number(formData.get("target_weight_kg")) : null;
+  const activity_level = formData.get("activity_level") as string | null;
+  const training_days_per_week = formData.get("training_days_per_week") ? Number(formData.get("training_days_per_week")) : null;
+  const experience_level = formData.get("experience_level") as string | null;
+  const preferred_gym_id = formData.get("preferred_gym_id") as string | null;
 
   const { error } = await supabase
     .from("profiles")
-    .update({
-      goal,
-      height_cm: height_cm ? Number(height_cm) : null,
-      body_fat_percent: body_fat_percent ? Number(body_fat_percent) : null,
-      target_weight_kg: target_weight_kg ? Number(target_weight_kg) : null,
-      activity_level,
-      training_days_per_week: training_days_per_week
-        ? Number(training_days_per_week)
-        : null,
-      experience_level,
-      preferred_gym_id: preferred_gym_id || null,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ goal, height_cm, body_fat_percent, target_weight_kg, activity_level, training_days_per_week, experience_level, preferred_gym_id })
     .eq("id", user.id);
 
-  if (error) {
-    redirect(`/settings?message=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/settings?message=${encodeURIComponent(error.message)}`);
 
-  }
-
+  revalidatePath("/settings");
   revalidatePath("/dashboard");
-  revalidatePath("/profile");
-  revalidatePath("/settings/profile");
-  redirect("/settings?message=Profile%20updated%20successfully");
+  redirect("/settings?message=Profile updated successfully");
 }
