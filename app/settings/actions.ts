@@ -52,3 +52,6 @@ export async function updateProfile(formData: FormData) {
   revalidatePath("/dashboard");
   redirect("/settings?message=Profile updated successfully");
 }
+
+// Alias used by onboarding-form.tsx in settings mode
+export const updateProfileSettings = updateProfile;
