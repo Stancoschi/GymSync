@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { WorkoutRow, BodyLogRow, GymSessionRow, PrHighlight } from "@/types/database";
 
 function startOfLast7Days() {
   const date = new Date();
@@ -90,9 +91,9 @@ export default async function DashboardPage() {
   const mealsCount = mealsCountResult.count ?? 0;
   const sessionsCreatedCount = sessionsCreatedCountResult.count ?? 0;
   const sessionsJoinedCount = sessionsJoinedCountResult.count ?? 0;
-  const recentWorkouts = recentWorkoutsResult.data ?? [];
-  const recentBodyLogs = recentBodyLogsResult.data ?? [];
-  const recentSessions = recentSessionsResult.data ?? [];
+  const recentWorkouts = (recentWorkoutsResult.data ?? []) as WorkoutRow[];
+  const recentBodyLogs = (recentBodyLogsResult.data ?? []) as BodyLogRow[];
+  const recentSessions = (recentSessionsResult.data ?? []) as GymSessionRow[];
   const allWorkoutsForStreak = allWorkoutsForStreakResult.data ?? [];
   const performanceSets = performanceSetsResult.data ?? [];
 
@@ -102,8 +103,11 @@ export default async function DashboardPage() {
 
   const workoutWeekStreak = calculateWorkoutWeekStreak(allWorkoutsForStreak);
 
-  const prMap = new Map<string, { exerciseName: string; weight: number; reps: number; estimated1RM: number; workoutDate: string; }>();
-  for (const set of performanceSets as any[]) {
+  const prMap = new Map<string, PrHighlight>();
+  for (const set of performanceSets as Array<{
+    reps: number; weight_kg: number;
+    workout_exercises: { exercises: { name: string } | null; workouts: { workout_date: string } | null } | null;
+  }>) {
     const exerciseName = set.workout_exercises?.exercises?.name;
     const workoutDate = set.workout_exercises?.workouts?.workout_date;
     const reps = Number(set.reps); const weight = Number(set.weight_kg);
@@ -123,7 +127,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-24 md:pb-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
           Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""} 👋
@@ -132,8 +135,8 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {([
           { label: "Latest weight", value: latestWeight?.weight_kg ? `${latestWeight.weight_kg} kg` : "—", sub: latestWeight?.log_date ?? "No logs yet" },
           { label: "Week streak", value: `${workoutWeekStreak} wk`, sub: "Consecutive active weeks", accent: workoutWeekStreak > 0 },
           { label: "Last 7 days", value: `${recentWorkoutsCount} workouts`, sub: "Consistency snapshot", accent: recentWorkoutsCount > 0 },
@@ -142,13 +145,11 @@ export default async function DashboardPage() {
           { label: "Sessions created", value: `${sessionsCreatedCount}`, sub: "Gym meetups posted" },
           { label: "Sessions joined", value: `${sessionsJoinedCount}`, sub: "Social participation" },
           { label: "Goal", value: getGoalLabel(profile?.goal), sub: profile?.experience_level ?? "Set in profile" },
-        ].map((stat) => (
+        ] as Array<{ label: string; value: string; sub: string; accent?: boolean }>).map((stat) => (
           <div
             key={stat.label}
             className={`rounded-2xl border p-4 space-y-1 transition-colors ${
-              stat.accent
-                ? "border-primary/30 bg-accent"
-                : "border-border bg-card"
+              stat.accent ? "border-primary/30 bg-accent" : "border-border bg-card"
             }`}
           >
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{stat.label}</p>
@@ -173,53 +174,38 @@ export default async function DashboardPage() {
 
       {/* Progress bars */}
       <section className="grid gap-4 md:grid-cols-3">
-        {/* Goal progress */}
         <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Goal progress</h2>
             <span className="text-xs rounded-md bg-muted px-2 py-1 text-muted-foreground">{getGoalLabel(profile?.goal)}</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {currentWeightValue && targetWeightValue
-              ? `${currentWeightValue} kg → ${targetWeightValue} kg`
-              : "Add weight & target to track progress"}
+            {currentWeightValue && targetWeightValue ? `${currentWeightValue} kg → ${targetWeightValue} kg` : "Add weight & target to track progress"}
           </p>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
             <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${goalProgressPercent ?? 0}%` }} />
           </div>
-          <p className="text-xs font-medium text-primary">
-            {goalProgressPercent !== null ? `${goalProgressPercent}% toward goal` : "Not available yet"}
-          </p>
+          <p className="text-xs font-medium text-primary">{goalProgressPercent !== null ? `${goalProgressPercent}% toward goal` : "Not available yet"}</p>
         </div>
 
-        {/* Weekly adherence */}
         <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Weekly adherence</h2>
-            <span className="text-xs rounded-md bg-muted px-2 py-1 text-muted-foreground">
-              {profile?.training_days_per_week ?? "—"} days target
-            </span>
+            <span className="text-xs rounded-md bg-muted px-2 py-1 text-muted-foreground">{profile?.training_days_per_week ?? "—"} days target</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {profile?.training_days_per_week
-              ? `${recentWorkoutsCount} of ${profile.training_days_per_week} sessions done`
-              : "Set weekly target in onboarding"}
+            {profile?.training_days_per_week ? `${recentWorkoutsCount} of ${profile.training_days_per_week} sessions done` : "Set weekly target in onboarding"}
           </p>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
             <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${adherencePercent ?? 0}%` }} />
           </div>
-          <p className="text-xs font-medium text-primary">
-            {adherencePercent !== null ? `${adherencePercent}% adherence` : "Not available yet"}
-          </p>
+          <p className="text-xs font-medium text-primary">{adherencePercent !== null ? `${adherencePercent}% adherence` : "Not available yet"}</p>
         </div>
 
-        {/* Coach note */}
         <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Coach note</h2>
-            <span className="text-xs rounded-md bg-muted px-2 py-1 text-muted-foreground">
-              {profile?.experience_level ?? "general"}
-            </span>
+            <span className="text-xs rounded-md bg-muted px-2 py-1 text-muted-foreground">{profile?.experience_level ?? "general"}</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">{coachMessage}</p>
           <div className="rounded-xl bg-muted/50 px-3 py-2.5">
@@ -231,7 +217,6 @@ export default async function DashboardPage() {
 
       {/* Lists */}
       <section className="grid gap-4 xl:grid-cols-2">
-        {/* PR highlights */}
         <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">PR highlights</h2>
@@ -239,7 +224,7 @@ export default async function DashboardPage() {
           </div>
           {prHighlights.length > 0 ? (
             <div className="space-y-2">
-              {prHighlights.map((pr) => (
+              {prHighlights.map((pr: PrHighlight) => (
                 <div key={pr.exerciseName} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5">
                   <div>
                     <p className="text-sm font-medium">{pr.exerciseName}</p>
@@ -257,7 +242,6 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Recent workouts */}
         <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Recent workouts</h2>
@@ -265,7 +249,7 @@ export default async function DashboardPage() {
           </div>
           {recentWorkouts.length > 0 ? (
             <div className="space-y-2">
-              {recentWorkouts.map((workout: any) => (
+              {recentWorkouts.map((workout: WorkoutRow) => (
                 <div key={workout.id} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5">
                   <div>
                     <p className="text-sm font-medium">{workout.title}</p>
@@ -282,7 +266,6 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Body logs */}
         <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Body logs</h2>
@@ -290,7 +273,7 @@ export default async function DashboardPage() {
           </div>
           {recentBodyLogs.length > 0 ? (
             <div className="space-y-2">
-              {recentBodyLogs.map((log: any) => (
+              {recentBodyLogs.map((log: BodyLogRow) => (
                 <div key={log.id} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5">
                   <div>
                     <p className="text-sm font-medium">{log.weight_kg} kg</p>
@@ -307,7 +290,6 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Upcoming sessions */}
         <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Upcoming sessions</h2>
@@ -315,7 +297,7 @@ export default async function DashboardPage() {
           </div>
           {recentSessions.length > 0 ? (
             <div className="space-y-2">
-              {recentSessions.map((session: any) => (
+              {recentSessions.map((session: GymSessionRow) => (
                 <div key={session.id} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5">
                   <div>
                     <p className="text-sm font-medium">{session.title}</p>
