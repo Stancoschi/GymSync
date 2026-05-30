@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export async function createWorkout(formData: FormData) {
+export async function createWorkoutTemplate(formData: FormData) {
   const supabase = await createClient();
 
   const {
@@ -15,76 +15,74 @@ export async function createWorkout(formData: FormData) {
     redirect("/auth/login");
   }
 
-  const title = formData.get("title") as string;
-  const notes = formData.get("notes") as string;
-  const workoutDate = formData.get("workout_date") as string;
-  const durationMinutesRaw = formData.get("duration_minutes") as string;
-  const exerciseId = formData.get("exercise_id") as string;
+  const name = (formData.get("name") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim();
 
-  const durationMinutes = durationMinutesRaw ? Number(durationMinutesRaw) : null;
+  if (!name) {
+    redirect("/workouts/new?message=Workout%20name%20is%20required");
+  }
 
-  const set1Reps = formData.get("set1_reps") as string;
-  const set1Weight = formData.get("set1_weight") as string;
-
-  const set2Reps = formData.get("set2_reps") as string;
-  const set2Weight = formData.get("set2_weight") as string;
-
-  const set3Reps = formData.get("set3_reps") as string;
-  const set3Weight = formData.get("set3_weight") as string;
-
-  const { data: workout, error: workoutError } = await supabase
-    .from("workouts")
+  const { data, error } = await supabase
+    .from("workout_templates")
     .insert({
       user_id: user.id,
-      title,
-      notes: notes || null,
-      workout_date: workoutDate,
-      duration_minutes: durationMinutes,
+      name,
+      description: description || null,
     })
     .select("id")
     .single();
 
-  if (workoutError || !workout) {
-    redirect(`/workouts?message=${encodeURIComponent(workoutError?.message || "Could not create workout")}`);
-  }
-
-  const { data: workoutExercise, error: workoutExerciseError } = await supabase
-    .from("workout_exercises")
-    .insert({
-      workout_id: workout.id,
-      exercise_id: exerciseId,
-      position: 1,
-    })
-    .select("id")
-    .single();
-
-  if (workoutExerciseError || !workoutExercise) {
-    redirect(`/workouts?message=${encodeURIComponent(workoutExerciseError?.message || "Could not create workout exercise")}`);
-  }
-
-  const setsToInsert = [
-    { reps: set1Reps, weight: set1Weight, set_number: 1 },
-    { reps: set2Reps, weight: set2Weight, set_number: 2 },
-    { reps: set3Reps, weight: set3Weight, set_number: 3 },
-  ]
-    .filter((set) => set.reps || set.weight)
-    .map((set) => ({
-      workout_exercise_id: workoutExercise.id,
-      set_number: set.set_number,
-      reps: set.reps ? Number(set.reps) : null,
-      weight_kg: set.weight ? Number(set.weight) : null,
-    }));
-
-  if (setsToInsert.length > 0) {
-    const { error: setsError } = await supabase
-      .from("exercise_sets")
-      .insert(setsToInsert);
-
-    if (setsError) {
-      redirect(`/workouts?message=${encodeURIComponent(setsError.message)}`);
-    }
+  if (error || !data) {
+    redirect(
+      `/workouts/new?message=${encodeURIComponent(error?.message || "Failed to create workout")}`
+    );
   }
 
   revalidatePath("/workouts");
-  redirect("/workouts?message=Workout%20created");
+  redirect(`/workouts/${data.id}`);
+}
+
+export async function addTemplateExercise(formData: FormData) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  const workout_template_id = formData.get("workout_template_id") as string;
+  const exercise_id = formData.get("exercise_id") as string;
+  const order_index = Number(formData.get("order_index"));
+  const target_sets = Number(formData.get("target_sets"));
+  const min_reps = Number(formData.get("min_reps"));
+  const max_reps = Number(formData.get("max_reps"));
+  const target_rirRaw = formData.get("target_rir") as string;
+  const load_incrementRaw = formData.get("load_increment") as string;
+  const notes = (formData.get("notes") as string)?.trim();
+
+  const { error } = await supabase
+    .from("workout_template_exercises")
+    .insert({
+      workout_template_id,
+      exercise_id,
+      order_index,
+      target_sets,
+      min_reps,
+      max_reps,
+      target_rir: target_rirRaw ? Number(target_rirRaw) : null,
+      load_increment: load_incrementRaw ? Number(load_incrementRaw) : null,
+      notes: notes || null,
+    });
+
+  if (error) {
+    redirect(
+      `/workouts/${workout_template_id}?message=${encodeURIComponent(error.message)}`
+    );
+  }
+
+  revalidatePath(`/workouts/${workout_template_id}`);
+  redirect(`/workouts/${workout_template_id}?message=Exercise%20added`);
 }

@@ -416,6 +416,13 @@ export default async function DashboardPage() {
           </p>
         </div>
       </section>
+      <Link href="/challenges" className="block rounded-2xl border p-5">
+  <p className="text-sm text-muted-foreground">Weekly challenge</p>
+  <h3 className="text-xl font-semibold">Complete 3 workouts this week</h3>
+  <p className="text-sm text-muted-foreground mt-2">
+    View your progress and compare with friends.
+  </p>
+</Link>
 
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-2xl border p-5 space-y-4">
@@ -620,6 +627,7 @@ export default async function DashboardPage() {
       <section className="rounded-2xl border p-5">
         <h2 className="text-lg font-semibold mb-3">Quick navigation</h2>
         <div className="flex flex-wrap gap-3">
+          
           <Link href="/profile" className="rounded-md border px-4 py-2">
             Profile
           </Link>
