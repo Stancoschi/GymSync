@@ -11,6 +11,7 @@ const navItems = [
   { href: "/feed", label: "Feed", icon: "◈" },
   { href: "/friends", label: "Friends", icon: "◌" },
   { href: "/challenges", label: "Challenges", icon: "◆" },
+  { href: "/search", label: "Search", icon: "○" },
 ];
 
 export function SidebarNav() {
@@ -46,9 +47,18 @@ export function SidebarNav() {
 export function BottomNav() {
   const pathname = usePathname();
 
+  // Bottom nav shows: Dashboard, Workouts, Sessions, Feed, Search
+  const bottomItems = [
+    navItems[0], // Dashboard
+    navItems[1], // Workouts
+    navItems[3], // Sessions
+    navItems[4], // Feed
+    navItems[7], // Search
+  ];
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-sidebar border-t border-border flex items-center justify-around px-2 py-2">
-      {navItems.slice(0, 5).map((item) => {
+      {bottomItems.map((item) => {
         const isActive =
           item.href === "/dashboard"
             ? pathname === "/dashboard"
