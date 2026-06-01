@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { WorkoutRow, BodyLogRow, GymSessionRow, PrHighlight } from "@/types/database";
+import { getSessionGym } from "@/types/database";
 import { WeightChart } from "@/components/dashboard/weight-chart";
 import { WorkoutVolumeChart } from "@/components/dashboard/workout-volume-chart";
 
@@ -55,7 +56,6 @@ function getWeekLabel(dateString: string) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  // Start of ISO week (Monday)
   const monday = new Date(d);
   monday.setUTCDate(d.getUTCDate() - (dayNum - 1));
   return monday.toLocaleDateString("ro-RO", { day: "numeric", month: "short" });
@@ -72,7 +72,6 @@ function calculateWorkoutWeekStreak(workouts: Array<{ workout_date: string }>) {
 }
 function calculateEstimated1RM(weight: number, reps: number) { return weight * (1 + reps / 30); }
 
-// ─── Compute weight chart data from body_logs (last 8 weeks) ─────────────────
 function buildWeightChartData(logs: Array<{ log_date: string; weight_kg: number | null }>) {
   return logs
     .filter((l) => l.weight_kg !== null)
@@ -83,12 +82,8 @@ function buildWeightChartData(logs: Array<{ log_date: string; weight_kg: number 
     .reverse();
 }
 
-// ─── Compute workout volume chart data (last 6 weeks) ────────────────────────
 function buildVolumeChartData(workouts: Array<{ workout_date: string }>) {
-  // Build map: weekKey -> { label, count }
   const weekMap = new Map<string, { label: string; count: number }>();
-
-  // Seed last 6 weeks in order
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i * 7);
@@ -96,15 +91,24 @@ function buildVolumeChartData(workouts: Array<{ workout_date: string }>) {
     const label = getWeekLabel(d.toISOString());
     if (!weekMap.has(key)) weekMap.set(key, { label, count: 0 });
   }
-
   for (const w of workouts) {
     const key = getWeekKey(w.workout_date);
     const entry = weekMap.get(key);
     if (entry) entry.count++;
   }
-
   return Array.from(weekMap.values()).map(({ label, count }) => ({ week: label, count }));
 }
+
+// Supabase returns nested joins as arrays even for many-to-one relations.
+// We use unknown cast here and access safely with Array.isArray guards.
+type RawPerformanceSet = {
+  reps: unknown;
+  weight_kg: unknown;
+  workout_exercises: Array<{
+    exercises: Array<{ name: string }>;
+    workouts: Array<{ workout_date: string }>;
+  }>;
+};
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -133,8 +137,7 @@ export default async function DashboardPage() {
     supabase.from("body_logs").select("id, log_date, weight_kg, body_fat_percent").order("log_date", { ascending: false }).limit(5),
     supabase.from("gym_sessions").select(`id, title, scheduled_for, max_participants, gyms ( name, city )`).order("scheduled_for", { ascending: true }).limit(5),
     supabase.from("workouts").select("workout_date").order("workout_date", { ascending: false }),
-    supabase.from("exercise_sets").select(`id, reps, weight_kg, workout_exercises ( id, exercises ( id, name ), workouts ( id, workout_date ) )`).not("weight_kg", "is", null).not("reps", "is", null).limit(200),
-    // Chart queries
+    supabase.from("exercise_sets").select(`reps, weight_kg, workout_exercises ( exercises ( name ), workouts ( workout_date ) )`).not("weight_kg", "is", null).not("reps", "is", null).limit(200),
     supabase.from("body_logs").select("log_date, weight_kg").gte("log_date", last8Weeks).order("log_date", { ascending: false }).limit(30),
     supabase.from("workouts").select("workout_date").gte("workout_date", last6Weeks),
   ]);
@@ -150,11 +153,10 @@ export default async function DashboardPage() {
   const sessionsJoinedCount = sessionsJoinedCountResult.count ?? 0;
   const recentWorkouts = (recentWorkoutsResult.data ?? []) as WorkoutRow[];
   const recentBodyLogs = (recentBodyLogsResult.data ?? []) as BodyLogRow[];
-  const recentSessions = (recentSessionsResult.data ?? []) as GymSessionRow[];
+  const recentSessions = (recentSessionsResult.data ?? []) as unknown as GymSessionRow[];
   const allWorkoutsForStreak = allWorkoutsForStreakResult.data ?? [];
-  const performanceSets = performanceSetsResult.data ?? [];
+  const performanceSets = (performanceSetsResult.data ?? []) as unknown as RawPerformanceSet[];
 
-  // Chart data
   const weightChartData = buildWeightChartData(weightLogsForChartResult.data ?? []);
   const volumeChartData = buildVolumeChartData(workoutsForVolumeResult.data ?? []);
 
@@ -165,17 +167,19 @@ export default async function DashboardPage() {
   const workoutWeekStreak = calculateWorkoutWeekStreak(allWorkoutsForStreak);
 
   const prMap = new Map<string, PrHighlight>();
-  for (const set of performanceSets as Array<{
-    reps: number; weight_kg: number;
-    workout_exercises: { exercises: { name: string } | null; workouts: { workout_date: string } | null } | null;
-  }>) {
-    const exerciseName = set.workout_exercises?.exercises?.name;
-    const workoutDate = set.workout_exercises?.workouts?.workout_date;
-    const reps = Number(set.reps); const weight = Number(set.weight_kg);
+  for (const set of performanceSets) {
+    const weArr = Array.isArray(set.workout_exercises) ? set.workout_exercises : [];
+    const we = weArr[0];
+    if (!we) continue;
+    const exerciseName = Array.isArray(we.exercises) ? we.exercises[0]?.name : undefined;
+    const workoutDate = Array.isArray(we.workouts) ? we.workouts[0]?.workout_date : undefined;
+    const reps = Number(set.reps);
+    const weight = Number(set.weight_kg);
     if (!exerciseName || !workoutDate || !reps || !weight) continue;
     const estimated1RM = calculateEstimated1RM(weight, reps);
     const existing = prMap.get(exerciseName);
-    if (!existing || estimated1RM > existing.estimated1RM) prMap.set(exerciseName, { exerciseName, weight, reps, estimated1RM, workoutDate });
+    if (!existing || estimated1RM > existing.estimated1RM)
+      prMap.set(exerciseName, { exerciseName, weight, reps, estimated1RM, workoutDate });
   }
   const prHighlights = Array.from(prMap.values()).sort((a, b) => b.estimated1RM - a.estimated1RM).slice(0, 5);
 
@@ -276,7 +280,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* ─── Charts ────────────────────────────────────────────────────────── */}
+      {/* Charts */}
       <section className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
@@ -285,7 +289,6 @@ export default async function DashboardPage() {
           </div>
           <WeightChart data={weightChartData} />
         </div>
-
         <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Workout volume</h2>
@@ -377,19 +380,22 @@ export default async function DashboardPage() {
           </div>
           {recentSessions.length > 0 ? (
             <div className="space-y-2">
-              {recentSessions.map((session: GymSessionRow) => (
-                <div key={session.id} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5">
-                  <div>
-                    <p className="text-sm font-medium">{session.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(session.scheduled_for).toLocaleDateString("ro-RO", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </p>
+              {recentSessions.map((session: GymSessionRow) => {
+                const gym = getSessionGym(session.gyms);
+                return (
+                  <div key={session.id} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5">
+                    <div>
+                      <p className="text-sm font-medium">{session.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(session.scheduled_for).toLocaleDateString("ro-RO", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground bg-muted rounded-md px-2 py-1 shrink-0">
+                      {gym?.name ?? "Gym"}
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground bg-muted rounded-md px-2 py-1 shrink-0">
-                    {session.gyms?.name ?? "Gym"}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-4 text-center">No upcoming sessions.</p>
