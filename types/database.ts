@@ -35,6 +35,9 @@ export interface ProfileRow {
   username: string | null;
   full_name: string | null;
   city: string | null;
+  bio: string | null;
+  goal: string | null;
+  avatar_url: string | null;
 }
 
 export interface FriendshipRow {
@@ -71,4 +74,18 @@ export interface WorkoutSetLog {
 export interface SessionParticipant {
   user_id: string;
   profiles: { full_name: string | null; username: string | null } | null;
+}
+
+export type NotificationType = 'friend_request' | 'friend_accepted' | 'session_joined';
+
+export interface NotificationRow {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  actor_id: string | null;
+  entity_id: string | null;
+  read: boolean;
+  created_at: string;
+  // joined
+  actor?: { full_name: string | null; username: string | null; avatar_url: string | null } | null;
 }
