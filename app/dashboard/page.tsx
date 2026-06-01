@@ -5,6 +5,7 @@ import type { WorkoutRow, BodyLogRow, GymSessionRow, PrHighlight } from "@/types
 import { getSessionGym } from "@/types/database";
 import { WeightChart } from "@/components/dashboard/weight-chart";
 import { WorkoutVolumeChart } from "@/components/dashboard/workout-volume-chart";
+import { WorkoutHeatmap } from "@/components/dashboard/workout-heatmap";
 
 function startOfLast7Days() {
   const date = new Date();
@@ -99,8 +100,21 @@ function buildVolumeChartData(workouts: Array<{ workout_date: string }>) {
   return Array.from(weekMap.values()).map(({ label, count }) => ({ week: label, count }));
 }
 
-// Supabase returns nested joins as arrays even for many-to-one relations.
-// We use unknown cast here and access safely with Array.isArray guards.
+/** Build day-by-day data for the heatmap — last N weeks */
+function buildHeatmapData(
+  workouts: Array<{ workout_date: string }>,
+  weeks: number
+): Array<{ date: string; count: number }> {
+  // Count workouts per day
+  const dayMap = new Map<string, number>();
+  for (const w of workouts) {
+    const ymd = w.workout_date.split("T")[0]; // ensure YYYY-MM-DD
+    dayMap.set(ymd, (dayMap.get(ymd) ?? 0) + 1);
+  }
+  // Return only days that have workouts (heatmap builds the full grid itself)
+  return Array.from(dayMap.entries()).map(([date, count]) => ({ date, count }));
+}
+
 type RawPerformanceSet = {
   reps: unknown;
   weight_kg: unknown;
@@ -118,13 +132,14 @@ export default async function DashboardPage() {
   const last7Days = startOfLast7Days();
   const last8Weeks = startOfLastNWeeks(8);
   const last6Weeks = startOfLastNWeeks(6);
+  const last16Weeks = startOfLastNWeeks(16);
 
   const [
     profileResult, latestWeightResult, workoutsCountResult,
     recentWorkoutsCountResult, mealsCountResult, sessionsCreatedCountResult,
     sessionsJoinedCountResult, recentWorkoutsResult, recentBodyLogsResult,
     recentSessionsResult, allWorkoutsForStreakResult, performanceSetsResult,
-    weightLogsForChartResult, workoutsForVolumeResult,
+    weightLogsForChartResult, workoutsForVolumeResult, workoutsForHeatmapResult,
   ] = await Promise.all([
     supabase.from("profiles").select(`username, full_name, goal, onboarding_completed, activity_level, training_days_per_week, experience_level, preferred_gym_id, target_weight_kg`).eq("id", user.id).single(),
     supabase.from("body_logs").select("weight_kg, log_date").order("log_date", { ascending: false }).limit(1).maybeSingle(),
@@ -140,6 +155,7 @@ export default async function DashboardPage() {
     supabase.from("exercise_sets").select(`reps, weight_kg, workout_exercises ( exercises ( name ), workouts ( workout_date ) )`).not("weight_kg", "is", null).not("reps", "is", null).limit(200),
     supabase.from("body_logs").select("log_date, weight_kg").gte("log_date", last8Weeks).order("log_date", { ascending: false }).limit(30),
     supabase.from("workouts").select("workout_date").gte("workout_date", last6Weeks),
+    supabase.from("workouts").select("workout_date").gte("workout_date", last16Weeks),
   ]);
 
   const profile = profileResult.data;
@@ -159,6 +175,7 @@ export default async function DashboardPage() {
 
   const weightChartData = buildWeightChartData(weightLogsForChartResult.data ?? []);
   const volumeChartData = buildVolumeChartData(workoutsForVolumeResult.data ?? []);
+  const heatmapData = buildHeatmapData(workoutsForHeatmapResult.data ?? [], 16);
 
   const preferredGymResult = profile?.preferred_gym_id
     ? await supabase.from("gyms").select("id, name, city").eq("id", profile.preferred_gym_id).maybeSingle()
@@ -295,6 +312,17 @@ export default async function DashboardPage() {
             <span className="text-xs text-muted-foreground">Last 6 weeks</span>
           </div>
           <WorkoutVolumeChart data={volumeChartData} />
+        </div>
+      </section>
+
+      {/* Workout Consistency Heatmap */}
+      <section>
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Workout consistency</h2>
+            <span className="text-xs text-muted-foreground">Last 16 weeks</span>
+          </div>
+          <WorkoutHeatmap data={heatmapData} weeks={16} />
         </div>
       </section>
 
