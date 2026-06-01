@@ -10,7 +10,7 @@ type Exercise = {
 };
 
 interface ExerciseComboboxProps {
-  exercises: Exercise[];
+  exercises?: Exercise[];
   /** Name of the hidden input that carries the selected id to the server action */
   inputName?: string;
   /** Pre-selected exercise id (for edit flows) */
@@ -18,7 +18,7 @@ interface ExerciseComboboxProps {
 }
 
 export function ExerciseCombobox({
-  exercises,
+  exercises = [],
   inputName = "exercise_id",
   defaultValue = "",
 }: ExerciseComboboxProps) {
@@ -150,8 +150,15 @@ export function ExerciseCombobox({
         </p>
       )}
 
+      {exercises.length === 0 && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          No exercises in library yet. Add some from the{" "}
+          <a href="/workouts" className="underline">workouts</a> page.
+        </p>
+      )}
+
       {/* Dropdown listbox */}
-      {open && (
+      {open && exercises.length > 0 && (
         <ul
           ref={listRef}
           id={listboxId}
