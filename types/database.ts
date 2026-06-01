@@ -14,12 +14,17 @@ export interface BodyLogRow {
   body_fat_percent: number | null;
 }
 
+// Supabase may return gyms as an object (when using .single()) or an array
+// depending on how the foreign key relation is resolved.
 export interface GymSessionRow {
   id: string;
   title: string;
   scheduled_for: string;
   max_participants: number | null;
-  gyms: { name: string; city: string | null } | null;
+  gyms:
+    | { name: string; city: string | null }
+    | { name: string; city: string | null }[]
+    | null;
 }
 
 export interface PrHighlight {
@@ -88,4 +93,13 @@ export interface NotificationRow {
   created_at: string;
   // joined
   actor?: { full_name: string | null; username: string | null; avatar_url: string | null } | null;
+}
+
+// Helper to normalize gyms field from GymSessionRow
+export function getSessionGym(
+  gyms: GymSessionRow["gyms"]
+): { name: string; city: string | null } | null {
+  if (!gyms) return null;
+  if (Array.isArray(gyms)) return gyms[0] ?? null;
+  return gyms;
 }
