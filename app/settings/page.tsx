@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingForm } from "@/components/onboarding/onboarding-form";
+import { DeleteAccountSection } from "@/components/settings/delete-account-section";
 import { updatePassword } from "./actions";
 
 export default async function ProfileSettingsPage({
@@ -96,6 +97,9 @@ export default async function ProfileSettingsPage({
             <p className="font-medium">{user.email}</p>
           </div>
         </section>
+
+        {/* Danger zone */}
+        <DeleteAccountSection email={user.email!} />
       </div>
     </main>
   );
