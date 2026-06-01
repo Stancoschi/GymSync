@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastWrapper } from "@/components/ui/toast-wrapper";
@@ -14,6 +14,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
+};
+
 export const metadata: Metadata = {
   title: {
     default: "GymSync",
@@ -28,10 +35,6 @@ export const metadata: Metadata = {
     type: "website",
   },
   manifest: "/manifest.json",
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-  ],
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -47,13 +50,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      // SSR fallback: render with 'dark' so the page never flashes white.
-      // ThemeInit (inline script) overwrites this class before paint on the client.
+      // SSR fallback: 'dark' ensures correct colors before ThemeInit runs on client.
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
-        {/* Must be first child of <head> — runs before any CSS is parsed */}
+        {/* Runs synchronously before any CSS — prevents flash of wrong theme */}
         <ThemeInit />
       </head>
       <body className="min-h-full flex flex-col">
