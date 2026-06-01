@@ -64,10 +64,18 @@ export default async function SearchPage({
   return (
     <main className="p-6 max-w-2xl mx-auto space-y-8">
       {/* Header */}
-      <div>
-        <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Discover</p>
-        <h1 className="text-3xl font-semibold">Search</h1>
-        <p className="text-sm text-muted-foreground">Find users, sessions and exercises.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Discover</p>
+          <h1 className="text-3xl font-semibold">Search</h1>
+          <p className="text-sm text-muted-foreground">Find users, sessions and exercises.</p>
+        </div>
+        <Link
+          href="/dashboard"
+          className="shrink-0 rounded-md border px-4 py-2 text-sm hover:bg-muted/40 transition-colors"
+        >
+          ← Dashboard
+        </Link>
       </div>
 
       {/* Search input */}
