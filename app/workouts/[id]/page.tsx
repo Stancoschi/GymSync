@@ -2,6 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AddTemplateExerciseForm } from "@/components/workouts/add-template-exercise-form";
+import { loadPrBaselines, calc1RM } from "@/lib/pr-tracker";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Workout" };
 
 export default async function WorkoutTemplateDetailsPage({
   params,
@@ -50,7 +54,7 @@ export default async function WorkoutTemplateDetailsPage({
       target_rir,
       load_increment,
       notes,
-      exercise_library (
+      exercise_library:exercise_id (
         id,
         name,
         muscle_group,
@@ -58,73 +62,91 @@ export default async function WorkoutTemplateDetailsPage({
       )
     `)
     .eq("workout_template_id", id)
-    .order("order_index", { ascending: true });
+    .order("order_index");
 
-  const { data: exerciseLibrary, error: libraryError } = await supabase
-    .from("exercise_library")
-    .select("id, name, muscle_group, equipment")
-    .order("name", { ascending: true });
-
-  if (exercisesError || libraryError) {
-    return (
-      <main className="p-6">
-        <p className="text-sm text-red-600">
-          {exercisesError?.message || libraryError?.message}
-        </p>
-      </main>
-    );
+  // --- PR baselines per exercise ---
+  const exerciseIds: string[] = [];
+  if (templateExercises) {
+    for (const item of templateExercises as any[]) {
+      const lib = Array.isArray(item.exercise_library)
+        ? item.exercise_library[0]
+        : item.exercise_library;
+      if (lib?.id) exerciseIds.push(lib.id);
+    }
   }
 
-  return (
-    <main className="p-6 space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
-            Training
-          </p>
-          <h1 className="text-3xl font-semibold">{template.name}</h1>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            {template.description || "No description yet."}
-          </p>
-        </div>
+  const prBaselines = await loadPrBaselines(supabase, user.id, exerciseIds);
 
-        <div className="flex items-center gap-3">
-          <Link href="/workouts" className="rounded-md border px-4 py-2 text-sm">
-            Back to workouts
-          </Link>
-          <Link href={`/workouts/${id}/start`} className="rounded-md bg-black px-4 py-2 text-sm text-white">
-  Start workout
-</Link>
+  return (
+    <main className="mx-auto max-w-2xl space-y-6 p-6">
+      {query?.message && (
+        <div className="rounded-lg bg-muted px-4 py-3 text-sm">
+          {decodeURIComponent(query.message)}
         </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">{template.name}</h1>
+          {template.description && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {template.description}
+            </p>
+          )}
+        </div>
+        <Link
+          href={`/workouts/${id}/session`}
+          className="shrink-0 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          Start workout
+        </Link>
       </div>
 
-      {query?.message ? (
-        <div className="rounded-xl border px-4 py-3 text-sm">{query.message}</div>
-      ) : null}
+      {/* Exercise list */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Exercises</h2>
 
-      <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-2xl border p-5 space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold">Exercises</h2>
-            <p className="text-sm text-muted-foreground">
-              Ordered list of exercises and target execution details.
-            </p>
-          </div>
+        {templateExercises && templateExercises.length > 0 ? (
+          <div className="space-y-3">
+            {(templateExercises as any[]).map((item) => {
+              const lib = Array.isArray(item.exercise_library)
+                ? item.exercise_library[0]
+                : item.exercise_library;
 
-          {templateExercises && templateExercises.length > 0 ? (
-            <div className="space-y-3">
-              {templateExercises.map((item: any) => (
+              const baseline = lib?.id ? prBaselines.get(lib.id) : undefined;
+              const hasPr = !!baseline;
+              const best1rm = baseline
+                ? Math.round(baseline.best_1rm * 10) / 10
+                : null;
+
+              return (
                 <div key={item.id} className="rounded-xl border p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <p className="font-medium">
-                        {item.order_index}. {item.exercise_library?.name}
+                        {item.order_index}. {lib?.name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {item.exercise_library?.muscle_group || "Unknown group"} •{" "}
-                        {item.exercise_library?.equipment || "Unknown equipment"}
+                        {lib?.muscle_group || "Unknown group"} &bull;{" "}
+                        {lib?.equipment || "Unknown equipment"}
                       </p>
                     </div>
+
+                    {/* PR badge */}
+                    {hasPr && (
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/20 px-2.5 py-0.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+                          🏆 PR
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Best 1RM: {best1rm} kg
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {baseline!.best_weight_kg} kg &times; {baseline!.best_reps} reps
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-3 grid gap-3 md:grid-cols-4 text-sm">
@@ -140,9 +162,7 @@ export default async function WorkoutTemplateDetailsPage({
                     </div>
                     <div className="rounded-lg bg-muted/40 p-3">
                       <p className="text-muted-foreground">Target RIR</p>
-                      <p className="font-medium">
-                        {item.target_rir ?? "-"}
-                      </p>
+                      <p className="font-medium">{item.target_rir ?? "-"}</p>
                     </div>
                     <div className="rounded-lg bg-muted/40 p-3">
                       <p className="text-muted-foreground">Load increment</p>
@@ -153,31 +173,35 @@ export default async function WorkoutTemplateDetailsPage({
                   </div>
 
                   {item.notes ? (
-                    <p className="mt-3 text-sm text-muted-foreground">{item.notes}</p>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {item.notes}
+                    </p>
                   ) : null}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border p-4 text-sm text-muted-foreground">
-              No exercises added yet.
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border p-5">
-          <h2 className="text-xl font-semibold">Add exercise</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Choose an exercise and define target sets, rep range and RIR.
-          </p>
-
-          <AddTemplateExerciseForm
-            workoutTemplateId={id}
-            exercises={exerciseLibrary ?? []}
-            nextOrderIndex={(templateExercises?.length ?? 0) + 1}
-          />
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+            No exercises added yet.
+          </div>
+        )}
       </section>
+
+      {/* Add exercise */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Add exercise</h2>
+        <AddTemplateExerciseForm templateId={id} />
+      </section>
+
+      <div className="flex gap-3">
+        <Link
+          href="/workouts"
+          className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+        >
+          &larr; Back to workouts
+        </Link>
+      </div>
     </main>
   );
 }

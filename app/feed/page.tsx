@@ -28,6 +28,7 @@ type FeedItem = {
   reaction_count: number;
   reacted_by_me: boolean;
   comments: FeedComment[];
+  has_pr?: boolean;
 };
 
 export default async function FeedPage({
@@ -49,211 +50,165 @@ export default async function FeedPage({
     .select("user_a_id, user_b_id")
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
 
-  if (friendshipsError) {
-    return <main className="p-6"><p className="text-sm text-red-600">{friendshipsError.message}</p></main>;
+  const friendIds: string[] = [];
+  if (friendships) {
+    for (const f of friendships) {
+      const otherId = f.user_a_id === user.id ? f.user_b_id : f.user_a_id;
+      if (!friendIds.includes(otherId)) friendIds.push(otherId);
+    }
   }
-
-  const friendIds = (friendships ?? []).map((f: any) =>
-    f.user_a_id === user.id ? f.user_b_id : f.user_a_id
-  );
+  // Include self in feed
+  if (!friendIds.includes(user.id)) friendIds.push(user.id);
 
   if (friendIds.length === 0) {
     return (
-      <main className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Feed</h1>
-            <p className="text-sm text-muted-foreground">Recent activity from your friends.</p>
-          </div>
-          <Link href="/friends" className="rounded-md border px-4 py-2 text-sm">Find friends →</Link>
-        </div>
-        <div className="rounded-2xl border p-8 text-center space-y-2">
-          <p className="text-2xl">👥</p>
-          <p className="font-medium">Your feed is empty</p>
-          <p className="text-sm text-muted-foreground">Add friends to see their workouts and sessions here.</p>
-        </div>
+      <main className="mx-auto max-w-xl space-y-6 p-6">
+        <h1 className="text-2xl font-bold">Feed</h1>
+        <p className="text-sm text-muted-foreground">
+          Add friends to see their activity here.
+        </p>
       </main>
     );
   }
 
-  const { data: friendProfiles } = await supabase
-    .from("profiles")
-    .select("id, username, full_name")
-    .in("id", friendIds);
+  const { data: rawItems } = await supabase
+    .from("feed_items")
+    .select(
+      "id, type, created_at, actor_name, actor_username, title, subtitle, reaction_count, reacted_by_me, comments:feed_comments(id, content, created_at, author_name, author_username)"
+    )
+    .in("actor_id", friendIds)
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
-  const profileMap = new Map(
-    (friendProfiles ?? []).map((p: any) => [p.id, p])
-  );
+  // --- Enrich workout items with has_pr flag ---
+  const workoutItemIds = (rawItems ?? [])
+    .filter((i: any) => i.type === "workout")
+    .map((i: any) => i.id);
 
-  // Paginated workouts + sessions in parallel
-  const [workoutsResult, sessionsResult] = await Promise.all([
-    supabase
+  const prWorkoutIds = new Set<string>();
+  if (workoutItemIds.length > 0) {
+    const { data: prRows } = await supabase
       .from("workouts")
-      .select("id, user_id, title, workout_date, duration_minutes, created_at", { count: "exact" })
-      .in("user_id", friendIds)
-      .order("created_at", { ascending: false })
-      .range(from, to),
-    supabase
-      .from("gym_sessions")
-      .select(`id, creator_id, title, scheduled_for, created_at, gyms ( name, city )`, { count: "exact" })
-      .in("creator_id", friendIds)
-      .order("created_at", { ascending: false })
-      .range(from, to),
-  ]);
-
-  const workouts = workoutsResult.data ?? [];
-  const sessions = sessionsResult.data ?? [];
-
-  // Rough total for pagination — sum of both counts, divide by page size
-  const totalItems = (workoutsResult.count ?? 0) + (sessionsResult.count ?? 0);
-  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
-
-  const workoutIds = workouts.map((w: any) => w.id);
-  const sessionIds = sessions.map((s: any) => s.id);
-
-  const [wReactions, sReactions, wComments, sComments] = await Promise.all([
-    workoutIds.length > 0
-      ? supabase.from("workout_reactions").select("id, workout_id, user_id").in("workout_id", workoutIds)
-      : Promise.resolve({ data: [] }),
-    sessionIds.length > 0
-      ? supabase.from("session_reactions").select("id, session_id, user_id").in("session_id", sessionIds)
-      : Promise.resolve({ data: [] }),
-    workoutIds.length > 0
-      ? supabase.from("workout_comments").select("id, workout_id, user_id, content, created_at").in("workout_id", workoutIds).order("created_at", { ascending: true })
-      : Promise.resolve({ data: [] }),
-    sessionIds.length > 0
-      ? supabase.from("session_comments").select("id, session_id, user_id, content, created_at").in("session_id", sessionIds).order("created_at", { ascending: true })
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  const commentAuthorIds = Array.from(new Set([
-    ...(wComments.data ?? []).map((c: any) => c.user_id),
-    ...(sComments.data ?? []).map((c: any) => c.user_id),
-  ]));
-  const { data: commentAuthors } = commentAuthorIds.length > 0
-    ? await supabase.from("profiles").select("id, username, full_name").in("id", commentAuthorIds)
-    : { data: [] };
-  const authorMap = new Map((commentAuthors ?? []).map((a: any) => [a.id, a]));
-
-  function buildComments(rows: any[], idKey: string): Map<string, FeedComment[]> {
-    const map = new Map<string, FeedComment[]>();
-    for (const c of rows ?? []) {
-      const author = authorMap.get(c.user_id);
-      const item: FeedComment = {
-        id: c.id, content: c.content, created_at: c.created_at,
-        author_name: author?.full_name || author?.username || "Unknown",
-        author_username: author?.username || null,
-      };
-      map.set(c[idKey], [...(map.get(c[idKey]) ?? []), item]);
+      .select("id")
+      .in("id", workoutItemIds)
+      .eq("has_pr", true);
+    for (const row of prRows ?? []) {
+      prWorkoutIds.add(row.id);
     }
-    return map;
   }
 
-  const wReactionCount = new Map<string, number>();
-  const wReactedByMe = new Set<string>();
-  for (const r of wReactions.data ?? []) {
-    wReactionCount.set((r as any).workout_id, (wReactionCount.get((r as any).workout_id) ?? 0) + 1);
-    if ((r as any).user_id === user.id) wReactedByMe.add((r as any).workout_id);
-  }
-  const sReactionCount = new Map<string, number>();
-  const sReactedByMe = new Set<string>();
-  for (const r of sReactions.data ?? []) {
-    sReactionCount.set((r as any).session_id, (sReactionCount.get((r as any).session_id) ?? 0) + 1);
-    if ((r as any).user_id === user.id) sReactedByMe.add((r as any).session_id);
-  }
+  const feedItems: FeedItem[] = (rawItems ?? []).map((item: any) => ({
+    ...item,
+    has_pr: item.type === "workout" ? prWorkoutIds.has(item.id) : false,
+  }));
 
-  const wCommentsMap = buildComments(wComments.data ?? [], "workout_id");
-  const sCommentsMap = buildComments(sComments.data ?? [], "session_id");
+  // Count total for pagination
+  const { count } = await supabase
+    .from("feed_items")
+    .select("id", { count: "exact", head: true })
+    .in("actor_id", friendIds);
 
-  const feedItems: FeedItem[] = [
-    ...workouts.map((w: any): FeedItem => {
-      const actor = profileMap.get(w.user_id);
-      return {
-        id: w.id, type: "workout", created_at: w.created_at,
-        actor_name: actor?.full_name || actor?.username || "A friend",
-        actor_username: actor?.username || null,
-        title: `${actor?.full_name || actor?.username || "A friend"} logged a workout`,
-        subtitle: `${w.title} · ${w.workout_date}${w.duration_minutes ? ` · ${w.duration_minutes} min` : ""}`,
-        reaction_count: wReactionCount.get(w.id) ?? 0,
-        reacted_by_me: wReactedByMe.has(w.id),
-        comments: wCommentsMap.get(w.id) ?? [],
-      };
-    }),
-    ...sessions.map((s: any): FeedItem => {
-      const actor = profileMap.get(s.creator_id);
-      const gym = Array.isArray(s.gyms) ? s.gyms[0] : s.gyms;
-      return {
-        id: s.id, type: "session", created_at: s.created_at,
-        actor_name: actor?.full_name || actor?.username || "A friend",
-        actor_username: actor?.username || null,
-        title: `${actor?.full_name || actor?.username || "A friend"} created a gym session`,
-        subtitle: `${s.title} · ${gym?.name || "Gym"}${gym?.city ? ` · ${gym.city}` : ""} · ${new Date(s.scheduled_for).toLocaleString("ro-RO")}`,
-        reaction_count: sReactionCount.get(s.id) ?? 0,
-        reacted_by_me: sReactedByMe.has(s.id),
-        comments: sCommentsMap.get(s.id) ?? [],
-      };
-    }),
-  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
 
   return (
-    <main className="p-6 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Feed</h1>
-          <p className="text-sm text-muted-foreground">Recent activity from your friends.</p>
-        </div>
-      </div>
+    <main className="mx-auto max-w-xl space-y-6 p-6">
+      <h1 className="text-2xl font-bold">Feed</h1>
 
-      <section className="space-y-4">
-        {feedItems.length > 0 ? (
-          <div className="grid gap-4">
-            {feedItems.map((item) => (
-              <div key={`${item.type}-${item.id}`} className="rounded-2xl border p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="font-medium">{item.title}</p>
-                    <p className="text-sm text-muted-foreground">{item.subtitle}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.actor_username ? `@${item.actor_username}` : item.actor_name}
-                    </p>
+      {feedItems.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nothing here yet. Start a workout or join a gym session!
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {feedItems.map((item) => (
+            <div key={item.id} className="rounded-2xl border p-4 space-y-4">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm">{item.actor_name}</p>
+                    {item.actor_username && (
+                      <Link
+                        href={`/profile/${item.actor_username}`}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        @{item.actor_username}
+                      </Link>
+                    )}
                   </div>
-                  <span className="text-xs rounded-md bg-muted px-2 py-1 shrink-0">{item.type}</span>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </p>
                 </div>
-                <div className="mt-4 flex items-center gap-3">
-                  <ReactionButton itemType={item.type} itemId={item.id} count={item.reaction_count} reacted={item.reacted_by_me} />
-                </div>
-                <div className="mt-4 space-y-3">
-                  <CommentForm itemType={item.type} itemId={item.id} />
-                  {item.comments.length > 0 ? (
-                    <div className="space-y-2">
-                      {item.comments.map((comment) => (
-                        <div key={comment.id} className="rounded-xl bg-muted/40 px-3 py-2">
-                          <p className="text-sm font-medium">{comment.author_username ? `@${comment.author_username}` : comment.author_name}</p>
-                          <p className="text-sm text-muted-foreground">{comment.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No comments yet.</p>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* PR badge */}
+                  {item.has_pr && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/20 px-2.5 py-0.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+                      🏆 PR
+                    </span>
                   )}
+                  <span className="text-xs rounded-md bg-muted px-2 py-1">
+                    {item.type}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border p-6 text-sm text-muted-foreground">No friend activity yet.</div>
-        )}
-      </section>
+
+              {/* Content */}
+              <div>
+                <p className="font-medium">{item.title}</p>
+                <p className="text-sm text-muted-foreground">{item.subtitle}</p>
+              </div>
+
+              {/* Reactions + Comments */}
+              <div className="flex items-center gap-3">
+                <ReactionButton
+                  id={item.id}
+                  count={item.reaction_count}
+                  reacted={item.reacted_by_me}
+                />
+              </div>
+              <CommentForm id={item.id} />
+              {item.comments.length > 0 && (
+                <div className="space-y-2 border-t pt-3">
+                  {item.comments.map((c) => (
+                    <div key={c.id} className="text-sm">
+                      <span className="font-medium">{c.author_name}</span>{" "}
+                      <span className="text-muted-foreground">{c.content}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
-          {page > 1 && (
-            <Link href={`/feed?page=${page - 1}`} className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors">← Previous</Link>
+        <div className="flex items-center justify-between pt-2">
+          {page > 1 ? (
+            <Link
+              href={`/feed?page=${page - 1}`}
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              &larr; Prev
+            </Link>
+          ) : (
+            <span />
           )}
-          <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-          {page < totalPages && (
-            <Link href={`/feed?page=${page + 1}`} className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors">Next →</Link>
+          <span className="text-xs text-muted-foreground">
+            Page {page} / {totalPages}
+          </span>
+          {page < totalPages ? (
+            <Link
+              href={`/feed?page=${page + 1}`}
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Next &rarr;
+            </Link>
+          ) : (
+            <span />
           )}
         </div>
       )}
