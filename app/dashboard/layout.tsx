@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/layout/logout-button";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "⊞" },
@@ -55,7 +56,14 @@ export default async function DashboardLayout({
         {/* Footer */}
         <div className="px-4 py-4 border-t border-border space-y-2">
           <Link
-            href="/settings/profile"
+            href="/notifications"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          >
+            <span className="text-base leading-none">🔔</span>
+            Notifications
+          </Link>
+          <Link
+            href="/settings"
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
           >
             <span className="text-base leading-none">⚙</span>
@@ -77,6 +85,7 @@ export default async function DashboardLayout({
           </span>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">{user.email}</span>
+            <NotificationBell />
             <div className="hidden md:block">
               <LogoutButton />
             </div>
