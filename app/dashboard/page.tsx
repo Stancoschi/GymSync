@@ -118,9 +118,9 @@ function buildHeatmapData(
 type RawPerformanceSet = {
   reps: unknown;
   weight_kg: unknown;
-  workout_exercises: Array<{
+  workout_session_exercises: Array<{
     exercises: Array<{ name: string }>;
-    workouts: Array<{ workout_date: string }>;
+    workout_sessions: Array<{ completed_at: string }>;
   }>;
 };
 
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
     supabase.from("body_logs").select("id, log_date, weight_kg, body_fat_percent").order("log_date", { ascending: false }).limit(5),
     supabase.from("gym_sessions").select(`id, title, scheduled_for, max_participants, gyms ( name, city )`).order("scheduled_for", { ascending: true }).limit(5),
     supabase.from("workouts").select("workout_date").order("workout_date", { ascending: false }),
-    supabase.from("exercise_sets").select(`reps, weight_kg, workout_exercises ( exercises ( name ), workouts ( workout_date ) )`).not("weight_kg", "is", null).not("reps", "is", null).limit(200),
+    supabase.from("workout_set_logs").select(`reps, weight_kg, workout_session_exercises ( exercise_id, exercises ( name ), workout_sessions ( completed_at ) )`).eq("completed", true).not("weight_kg", "is", null).not("reps", "is", null).eq("workout_session_exercises.workout_sessions.user_id", user.id).limit(200),
     supabase.from("body_logs").select("log_date, weight_kg").gte("log_date", last8Weeks).order("log_date", { ascending: false }).limit(30),
     supabase.from("workouts").select("workout_date").gte("workout_date", last6Weeks),
     supabase.from("workouts").select("workout_date").gte("workout_date", last16Weeks),
@@ -185,11 +185,11 @@ export default async function DashboardPage() {
 
   const prMap = new Map<string, PrHighlight>();
   for (const set of performanceSets) {
-    const weArr = Array.isArray(set.workout_exercises) ? set.workout_exercises : [];
+    const weArr = Array.isArray(set.workout_session_exercises) ? set.workout_session_exercises : [];
     const we = weArr[0];
     if (!we) continue;
     const exerciseName = Array.isArray(we.exercises) ? we.exercises[0]?.name : undefined;
-    const workoutDate = Array.isArray(we.workouts) ? we.workouts[0]?.workout_date : undefined;
+    const workoutDate = Array.isArray(we.workout_sessions) ? we.workout_sessions[0]?.completed_at : undefined;
     const reps = Number(set.reps);
     const weight = Number(set.weight_kg);
     if (!exerciseName || !workoutDate || !reps || !weight) continue;
