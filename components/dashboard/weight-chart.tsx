@@ -8,7 +8,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine,
 } from "recharts";
 
 interface WeightPoint {
@@ -21,7 +20,6 @@ interface WeightChartProps {
   data: WeightPoint[];
 }
 
-/** Simple linear regression — returns slope & intercept */
 function linearRegression(points: { x: number; y: number }[]) {
   const n = points.length;
   if (n < 2) return null;
@@ -34,7 +32,6 @@ function linearRegression(points: { x: number; y: number }[]) {
   return { slope, intercept };
 }
 
-/** Attach a trend value to each data point via linear regression */
 function withTrend(data: WeightPoint[]): WeightPoint[] {
   if (data.length < 2) return data;
   const points = data.map((d, i) => ({ x: i, y: d.weight }));
@@ -45,6 +42,15 @@ function withTrend(data: WeightPoint[]): WeightPoint[] {
     trend: parseFloat((reg.intercept + reg.slope * i).toFixed(2)),
   }));
 }
+
+// Recharts renders SVG — CSS variables resolve only if the SVG inherits them
+// from the DOM. Using `var(--primary)` directly (no `hsl()` wrapper) works
+// because Tailwind / shadcn expose these as raw color values, not hsl channels.
+const COLOR_LINE = "var(--color-primary)";
+const COLOR_TREND = "var(--color-muted-foreground)";
+const COLOR_GRID = "var(--color-border)";
+const COLOR_TICK = "var(--color-muted-foreground)";
+const COLOR_CARD = "var(--color-card)";
 
 export function WeightChart({ data }: WeightChartProps) {
   if (data.length === 0) {
@@ -57,27 +63,31 @@ export function WeightChart({ data }: WeightChartProps) {
 
   const chartData = withTrend(data);
 
-  // Y-axis domain with a bit of padding
   const weights = data.map((d) => d.weight);
   const minW = Math.min(...weights);
   const maxW = Math.max(...weights);
-  const padding = Math.max(1, (maxW - minW) * 0.2);
+  const padding = Math.max(1, (maxW - minW) * 0.25);
   const yMin = parseFloat((minW - padding).toFixed(1));
   const yMax = parseFloat((maxW + padding).toFixed(1));
 
   return (
     <ResponsiveContainer width="100%" height={200}>
       <ComposedChart data={chartData} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+        <CartesianGrid
+          strokeDasharray="3 3"
+          stroke={COLOR_GRID}
+          vertical={false}
+          opacity={0.5}
+        />
         <XAxis
           dataKey="date"
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: COLOR_TICK }}
           tickLine={false}
           axisLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: COLOR_TICK }}
           tickLine={false}
           axisLine={false}
           domain={[yMin, yMax]}
@@ -85,8 +95,8 @@ export function WeightChart({ data }: WeightChartProps) {
         />
         <Tooltip
           contentStyle={{
-            background: "hsl(var(--card))",
-            border: "1px solid hsl(var(--border))",
+            background: COLOR_CARD,
+            border: `1px solid ${COLOR_GRID}`,
             borderRadius: "8px",
             fontSize: 12,
           }}
@@ -96,27 +106,29 @@ export function WeightChart({ data }: WeightChartProps) {
           ]}
         />
 
-        {/* Actual weight — connected line with dots */}
+        {/* Actual weight — solid line, visible dots */}
         <Line
           type="monotone"
           dataKey="weight"
-          stroke="hsl(var(--primary))"
-          strokeWidth={2}
-          dot={{ r: 3, fill: "hsl(var(--primary))", strokeWidth: 0 }}
-          activeDot={{ r: 5, strokeWidth: 0 }}
+          stroke={COLOR_LINE}
+          strokeWidth={2.5}
+          dot={{ r: 4, fill: COLOR_LINE, stroke: "none" }}
+          activeDot={{ r: 6, stroke: "none" }}
           connectNulls
+          isAnimationActive={false}
         />
 
         {/* Trend line — dashed, no dots */}
         <Line
           type="monotone"
           dataKey="trend"
-          stroke="hsl(var(--muted-foreground))"
+          stroke={COLOR_TREND}
           strokeWidth={1.5}
-          strokeDasharray="5 4"
+          strokeDasharray="6 4"
           dot={false}
           activeDot={false}
-          legendType="none"
+          connectNulls
+          isAnimationActive={false}
         />
       </ComposedChart>
     </ResponsiveContainer>
