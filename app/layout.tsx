@@ -47,10 +47,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // SSR fallback: render with 'dark' so the page never flashes white.
+      // ThemeInit (inline script) overwrites this class before paint on the client.
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
+        {/* Must be first child of <head> — runs before any CSS is parsed */}
         <ThemeInit />
       </head>
       <body className="min-h-full flex flex-col">
