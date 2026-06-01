@@ -19,7 +19,7 @@ const PROTECTED_PREFIXES = [
 // Routes only for unauthenticated users (redirect logged-in users away)
 const AUTH_ROUTES = ["/auth/login", "/auth/register"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Refresh session cookies (required by Supabase SSR)
   const response = await updateSession(request);
 
@@ -60,6 +60,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|icons|.*\.png$|.*\.svg$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|icons|.*\\.png$|.*\\.svg$).*)",
   ],
 };
