@@ -73,7 +73,7 @@ export async function finishWorkoutSession(formData: FormData) {
     );
   }
 
-  // 3. Insert workout log (for streak/feed)
+  // 3. Insert workout log (for streak/feed) — include has_pr flag
   const { data: wTemplate } = await supabase
     .from("workout_templates")
     .select("name")
@@ -85,18 +85,12 @@ export async function finishWorkoutSession(formData: FormData) {
     title: wTemplate?.name ?? "Workout",
     workout_date: new Date().toISOString().split("T")[0],
     duration_minutes: Math.round(durationSeconds / 60),
+    has_pr: newPrs.length > 0,
   });
 
   // 4. Notify friends about PRs
   if (newPrs.length > 0) {
-    const { data: friendships } = await supabase
-      .from("friendships")
-      .select("user_a_id, user_b_id")
-      .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
-
-    const friendIds = (friendships ?? []).map((f: any) =>
-      f.user_a_id === user.id ? f.user_b_id : f.user_a_id
-    );
+    const prText = newPrs.join(", ");
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -104,8 +98,16 @@ export async function finishWorkoutSession(formData: FormData) {
       .eq("id", user.id)
       .single();
 
-    const name = profile?.full_name || profile?.username || "Someone";
-    const prText = newPrs.slice(0, 3).join(", ");
+    const name = profile?.full_name ?? profile?.username ?? "Someone";
+
+    const { data: friendships } = await supabase
+      .from("friendships")
+      .select("user_a_id, user_b_id")
+      .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
+
+    const friendIds = (friendships ?? []).map((f) =>
+      f.user_a_id === user.id ? f.user_b_id : f.user_a_id
+    );
 
     for (const friendId of friendIds) {
       await createNotification(supabase, {
@@ -118,5 +120,7 @@ export async function finishWorkoutSession(formData: FormData) {
     }
   }
 
-  redirect(`/workouts/${templateId}/session/summary?session_id=${session.id}&prs=${encodeURIComponent(newPrs.join(","))}`);
+  redirect(
+    `/workouts/${templateId}/session/summary?session_id=${session.id}&prs=${encodeURIComponent(newPrs.join(","))}`
+  );
 }
