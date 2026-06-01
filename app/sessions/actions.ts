@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createNotification } from "@/lib/notifications";
 
 // ─── Gym Social Sessions ──────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ export async function joinSession(formData: FormData) {
   // 2. Check max_participants cap
   const { data: session } = await supabase
     .from("gym_sessions")
-    .select("max_participants")
+    .select("max_participants, creator_id")
     .eq("id", sessionId)
     .single();
 
@@ -85,6 +86,16 @@ export async function joinSession(formData: FormData) {
   });
 
   if (error) redirect(`/sessions?message=${encodeURIComponent(error.message)}`);
+
+  // 4. Notify session creator (silent — nu blochează redirect-ul)
+  if (session?.creator_id && session.creator_id !== user.id) {
+    await createNotification({
+      userId: session.creator_id,
+      type: "session_joined",
+      actorId: user.id,
+      entityId: sessionId,
+    });
+  }
 
   revalidatePath("/sessions");
   redirect("/sessions?message=Joined%20successfully");

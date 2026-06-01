@@ -77,3 +77,27 @@ export async function uploadAvatar(formData: FormData) {
   revalidatePath("/profile");
   redirect("/profile?message=Avatar updated successfully");
 }
+
+export async function updateProfile(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
+
+  const username = formData.get("username") as string;
+  const full_name = formData.get("full_name") as string;
+  const bio = formData.get("bio") as string;
+  const city = formData.get("city") as string;
+  const goal = formData.get("goal") as string;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ username, full_name, bio, city, goal })
+    .eq("id", user.id);
+
+  if (error) redirect(`/profile?message=${encodeURIComponent(error.message)}`);
+
+  revalidatePath("/profile");
+  redirect("/profile?message=Profile updated successfully");
+}

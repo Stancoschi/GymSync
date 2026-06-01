@@ -2,7 +2,7 @@
 
 import {
   acceptFriendRequest,
-  rejectFriendRequest,
+  declineFriendRequest,
 } from "@/app/friends/actions";
 
 export function RespondFriendRequestForm({
@@ -22,10 +22,10 @@ export function RespondFriendRequestForm({
         </button>
       </form>
 
-      <form action={rejectFriendRequest}>
+      <form action={declineFriendRequest}>
         <input type="hidden" name="request_id" value={requestId} />
         <button type="submit" className="rounded-md border px-4 py-2 text-sm">
-          Reject
+          Decline
         </button>
       </form>
     </div>
