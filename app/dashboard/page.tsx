@@ -2,10 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { WorkoutRow, BodyLogRow, GymSessionRow, PrHighlight } from "@/types/database";
+import { WeightChart } from "@/components/dashboard/weight-chart";
+import { WorkoutVolumeChart } from "@/components/dashboard/workout-volume-chart";
 
 function startOfLast7Days() {
   const date = new Date();
   date.setDate(date.getDate() - 7);
+  return date.toISOString().split("T")[0];
+}
+function startOfLastNWeeks(n: number) {
+  const date = new Date();
+  date.setDate(date.getDate() - n * 7);
   return date.toISOString().split("T")[0];
 }
 function getGoalLabel(goal: string | null | undefined) {
@@ -43,6 +50,16 @@ function getWeekKey(dateString: string) {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return `${d.getUTCFullYear()}-W${Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)}`;
 }
+function getWeekLabel(dateString: string) {
+  const date = new Date(dateString);
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  // Start of ISO week (Monday)
+  const monday = new Date(d);
+  monday.setUTCDate(d.getUTCDate() - (dayNum - 1));
+  return monday.toLocaleDateString("ro-RO", { day: "numeric", month: "short" });
+}
 function calculateWorkoutWeekStreak(workouts: Array<{ workout_date: string }>) {
   if (!workouts.length) return 0;
   const uniqueWeeks = Array.from(new Set(workouts.map((w) => getWeekKey(w.workout_date)))).sort();
@@ -55,18 +72,55 @@ function calculateWorkoutWeekStreak(workouts: Array<{ workout_date: string }>) {
 }
 function calculateEstimated1RM(weight: number, reps: number) { return weight * (1 + reps / 30); }
 
+// ─── Compute weight chart data from body_logs (last 8 weeks) ─────────────────
+function buildWeightChartData(logs: Array<{ log_date: string; weight_kg: number | null }>) {
+  return logs
+    .filter((l) => l.weight_kg !== null)
+    .map((l) => ({
+      date: new Date(l.log_date).toLocaleDateString("ro-RO", { day: "numeric", month: "short" }),
+      weight: Number(l.weight_kg),
+    }))
+    .reverse();
+}
+
+// ─── Compute workout volume chart data (last 6 weeks) ────────────────────────
+function buildVolumeChartData(workouts: Array<{ workout_date: string }>) {
+  // Build map: weekKey -> { label, count }
+  const weekMap = new Map<string, { label: string; count: number }>();
+
+  // Seed last 6 weeks in order
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i * 7);
+    const key = getWeekKey(d.toISOString());
+    const label = getWeekLabel(d.toISOString());
+    if (!weekMap.has(key)) weekMap.set(key, { label, count: 0 });
+  }
+
+  for (const w of workouts) {
+    const key = getWeekKey(w.workout_date);
+    const entry = weekMap.get(key);
+    if (entry) entry.count++;
+  }
+
+  return Array.from(weekMap.values()).map(({ label, count }) => ({ week: label, count }));
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
   const last7Days = startOfLast7Days();
+  const last8Weeks = startOfLastNWeeks(8);
+  const last6Weeks = startOfLastNWeeks(6);
 
   const [
     profileResult, latestWeightResult, workoutsCountResult,
     recentWorkoutsCountResult, mealsCountResult, sessionsCreatedCountResult,
     sessionsJoinedCountResult, recentWorkoutsResult, recentBodyLogsResult,
     recentSessionsResult, allWorkoutsForStreakResult, performanceSetsResult,
+    weightLogsForChartResult, workoutsForVolumeResult,
   ] = await Promise.all([
     supabase.from("profiles").select(`username, full_name, goal, onboarding_completed, activity_level, training_days_per_week, experience_level, preferred_gym_id, target_weight_kg`).eq("id", user.id).single(),
     supabase.from("body_logs").select("weight_kg, log_date").order("log_date", { ascending: false }).limit(1).maybeSingle(),
@@ -80,6 +134,9 @@ export default async function DashboardPage() {
     supabase.from("gym_sessions").select(`id, title, scheduled_for, gyms ( name, city )`).order("scheduled_for", { ascending: true }).limit(5),
     supabase.from("workouts").select("workout_date").order("workout_date", { ascending: false }),
     supabase.from("exercise_sets").select(`id, reps, weight_kg, workout_exercises ( id, exercises ( id, name ), workouts ( id, workout_date ) )`).not("weight_kg", "is", null).not("reps", "is", null).limit(200),
+    // Chart queries
+    supabase.from("body_logs").select("log_date, weight_kg").gte("log_date", last8Weeks).order("log_date", { ascending: false }).limit(30),
+    supabase.from("workouts").select("workout_date").gte("workout_date", last6Weeks),
   ]);
 
   const profile = profileResult.data;
@@ -96,6 +153,10 @@ export default async function DashboardPage() {
   const recentSessions = (recentSessionsResult.data ?? []) as GymSessionRow[];
   const allWorkoutsForStreak = allWorkoutsForStreakResult.data ?? [];
   const performanceSets = performanceSetsResult.data ?? [];
+
+  // Chart data
+  const weightChartData = buildWeightChartData(weightLogsForChartResult.data ?? []);
+  const volumeChartData = buildVolumeChartData(workoutsForVolumeResult.data ?? []);
 
   const preferredGymResult = profile?.preferred_gym_id
     ? await supabase.from("gyms").select("id, name, city").eq("id", profile.preferred_gym_id).maybeSingle()
@@ -212,6 +273,25 @@ export default async function DashboardPage() {
             <p className="text-xs font-medium">{preferredGym?.name ?? "No preferred gym"}</p>
             <p className="text-xs text-muted-foreground">{preferredGym?.city ?? "Set one in profile settings"}</p>
           </div>
+        </div>
+      </section>
+
+      {/* ─── Charts ────────────────────────────────────────────────────────── */}
+      <section className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Weight evolution</h2>
+            <span className="text-xs text-muted-foreground">Last 8 weeks</span>
+          </div>
+          <WeightChart data={weightChartData} />
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Workout volume</h2>
+            <span className="text-xs text-muted-foreground">Last 6 weeks</span>
+          </div>
+          <WorkoutVolumeChart data={volumeChartData} />
         </div>
       </section>
 

@@ -3,16 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { NotificationBell } from "@/components/layout/notification-bell";
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: "⊞" },
-  { href: "/workouts", label: "Workouts", icon: "◈" },
-  { href: "/nutrition", label: "Nutrition", icon: "◉" },
-  { href: "/sessions", label: "Sessions", icon: "◎" },
-  { href: "/feed", label: "Feed", icon: "◈" },
-  { href: "/friends", label: "Friends", icon: "◌" },
-  { href: "/challenges", label: "Challenges", icon: "◆" },
-];
+import { SidebarNav, BottomNav } from "@/components/layout/sidebar-nav";
 
 export default async function DashboardLayout({
   children,
@@ -39,19 +30,8 @@ export default async function DashboardLayout({
           </span>
         </div>
 
-        {/* Nav links */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-primary transition-colors"
-            >
-              <span className="text-base leading-none text-primary">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        {/* Nav links — client component pentru active state */}
+        <SidebarNav />
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-border space-y-2">
@@ -96,19 +76,8 @@ export default async function DashboardLayout({
         <main className="flex-1 p-5 md:p-7">{children}</main>
       </div>
 
-      {/* Bottom nav — mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-sidebar border-t border-border flex items-center justify-around px-2 py-2">
-        {navItems.slice(0, 5).map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-sidebar-foreground hover:text-primary transition-colors"
-          >
-            <span className="text-lg leading-none">{item.icon}</span>
-            <span className="text-[10px] font-medium">{item.label}</span>
-          </Link>
-        ))}
-      </nav>
+      {/* Bottom nav — mobile, client component pentru active state */}
+      <BottomNav />
     </div>
   );
 }
