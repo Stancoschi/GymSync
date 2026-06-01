@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { SidebarNav, BottomNav } from "@/components/layout/sidebar-nav";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 export default async function DashboardLayout({
   children,
@@ -30,7 +31,7 @@ export default async function DashboardLayout({
           </span>
         </div>
 
-        {/* Nav links — client component pentru active state */}
+        {/* Nav links */}
         <SidebarNav />
 
         {/* Footer */}
@@ -65,6 +66,7 @@ export default async function DashboardLayout({
           </span>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">{user.email}</span>
+            <ThemeToggle />
             <NotificationBell />
             <div className="hidden md:block">
               <LogoutButton />
@@ -76,7 +78,7 @@ export default async function DashboardLayout({
         <main className="flex-1 p-5 md:p-7">{children}</main>
       </div>
 
-      {/* Bottom nav — mobile, client component pentru active state */}
+      {/* Bottom nav — mobile */}
       <BottomNav />
     </div>
   );
