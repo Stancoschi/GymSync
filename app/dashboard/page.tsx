@@ -131,7 +131,7 @@ export default async function DashboardPage() {
     supabase.from("gym_session_participants").select("*", { count: "exact", head: true }).eq("user_id", user.id),
     supabase.from("workouts").select("id, title, workout_date, duration_minutes").order("workout_date", { ascending: false }).limit(5),
     supabase.from("body_logs").select("id, log_date, weight_kg, body_fat_percent").order("log_date", { ascending: false }).limit(5),
-    supabase.from("gym_sessions").select(`id, title, scheduled_for, gyms ( name, city )`).order("scheduled_for", { ascending: true }).limit(5),
+    supabase.from("gym_sessions").select(`id, title, scheduled_for, max_participants, gyms ( name, city )`).order("scheduled_for", { ascending: true }).limit(5),
     supabase.from("workouts").select("workout_date").order("workout_date", { ascending: false }),
     supabase.from("exercise_sets").select(`id, reps, weight_kg, workout_exercises ( id, exercises ( id, name ), workouts ( id, workout_date ) )`).not("weight_kg", "is", null).not("reps", "is", null).limit(200),
     // Chart queries
