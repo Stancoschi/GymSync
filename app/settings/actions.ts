@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export async function updatePassword(formData: FormData) {
   const supabase = await createClient();
@@ -55,3 +56,43 @@ export async function updateProfile(formData: FormData) {
 
 // Alias used by onboarding-form.tsx in settings mode
 export const updateProfileSettings = updateProfile;
+
+export async function deleteAccount(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
+
+  // Double-check: user must type their email to confirm
+  const confirmation = (formData.get("confirmation") as string)?.trim();
+  if (confirmation !== user.email) {
+    redirect("/settings?message=Email does not match. Account not deleted.");
+  }
+
+  // Delete user data in order (foreign key safe)
+  // Supabase RLS allows users to delete their own rows;
+  // cascade deletes handle child rows where FK+cascade is set.
+  await supabase.from("notifications").delete().eq("user_id", user.id);
+  await supabase.from("gym_session_participants").delete().eq("user_id", user.id);
+  await supabase.from("friendships").delete().or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
+  await supabase.from("friend_requests").delete().or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+  await supabase.from("body_logs").delete().eq("user_id", user.id);
+  await supabase.from("workouts").delete().eq("user_id", user.id);
+  await supabase.from("gym_sessions").delete().eq("creator_id", user.id);
+  await supabase.from("profiles").delete().eq("id", user.id);
+
+  // Sign the user out first so the cookie is cleared
+  await supabase.auth.signOut();
+
+  // Delete the auth user via service role (requires SUPABASE_SERVICE_ROLE_KEY env var)
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (serviceRoleKey && supabaseUrl) {
+    const admin = createAdminClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    await admin.auth.admin.deleteUser(user.id);
+  }
+
+  redirect("/");
+}
