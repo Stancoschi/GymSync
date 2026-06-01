@@ -42,6 +42,9 @@ export async function createWorkoutTemplate(formData: FormData) {
   redirect(`/workouts/${data.id}`);
 }
 
+// Alias used by create-workout-form.tsx
+export const createWorkout = createWorkoutTemplate;
+
 export async function addTemplateExercise(formData: FormData) {
   const supabase = await createClient();
 

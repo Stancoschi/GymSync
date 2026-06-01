@@ -3,25 +3,38 @@ import { createClient } from "@/lib/supabase/server";
 import { markAllRead } from "./actions";
 import Link from "next/link";
 import type { Metadata } from "next";
-import type { NotificationRow } from "@/types/database";
+import type { NotificationType } from "@/types/database";
 
 export const metadata: Metadata = { title: "Notifications" };
 
-function notificationLabel(n: NotificationRow): string {
-  const actor = n.actor?.full_name ?? n.actor?.username ?? "Someone";
+// Local type matching exactly what the query selects.
+// actor comes as an array from Supabase FK join.
+type NotificationItem = {
+  id: string;
+  type: NotificationType;
+  read: boolean;
+  created_at: string;
+  entity_id: string | null;
+  actor: Array<{ full_name: string | null; username: string | null; avatar_url: string | null }> | null;
+};
+
+function getActor(n: NotificationItem) {
+  if (Array.isArray(n.actor)) return n.actor[0] ?? null;
+  return n.actor;
+}
+
+function notificationLabel(n: NotificationItem): string {
+  const a = getActor(n);
+  const name = a?.full_name ?? a?.username ?? "Someone";
   switch (n.type) {
-    case "friend_request":
-      return `${actor} sent you a friend request`;
-    case "friend_accepted":
-      return `${actor} accepted your friend request`;
-    case "session_joined":
-      return `${actor} joined your gym session`;
-    default:
-      return "New notification";
+    case "friend_request": return `${name} sent you a friend request`;
+    case "friend_accepted": return `${name} accepted your friend request`;
+    case "session_joined": return `${name} joined your gym session`;
+    default: return "New notification";
   }
 }
 
-function notificationHref(n: NotificationRow): string {
+function notificationHref(n: NotificationItem): string {
   switch (n.type) {
     case "friend_request":
     case "friend_accepted":
@@ -43,22 +56,17 @@ function timeAgo(dateStr: string): string {
 
 export default async function NotificationsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const { data: notifications } = await supabase
+  const { data: raw } = await supabase
     .from("notifications")
-    .select(
-      `id, type, read, created_at, entity_id,
-       actor:actor_id ( full_name, username, avatar_url )`
-    )
+    .select(`id, type, read, created_at, entity_id, actor:actor_id ( full_name, username, avatar_url )`)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const items: NotificationRow[] = (notifications ?? []) as NotificationRow[];
+  const items = (raw ?? []) as unknown as NotificationItem[];
   const unreadCount = items.filter((n) => !n.read).length;
 
   return (
@@ -67,17 +75,12 @@ export default async function NotificationsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Notifications</h1>
           {unreadCount > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {unreadCount} unread
-            </p>
+            <p className="text-sm text-muted-foreground">{unreadCount} unread</p>
           )}
         </div>
         {unreadCount > 0 && (
           <form action={markAllRead}>
-            <button
-              type="submit"
-              className="text-sm text-primary hover:underline"
-            >
+            <button type="submit" className="text-sm text-primary hover:underline">
               Mark all as read
             </button>
           </form>
@@ -100,17 +103,10 @@ export default async function NotificationsPage() {
                   !n.read ? "bg-primary/5" : ""
                 }`}
               >
-                {/* Unread dot */}
-                <span
-                  className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                    !n.read ? "bg-primary" : "bg-transparent"
-                  }`}
-                />
+                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${!n.read ? "bg-primary" : "bg-transparent"}`} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">{notificationLabel(n)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {timeAgo(n.created_at)}
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(n.created_at)}</p>
                 </div>
               </Link>
             </li>
