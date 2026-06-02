@@ -30,6 +30,11 @@ interface Props {
   targetWeightKg?: number | null;
 }
 
+// Hex colors — SVG stroke/fill does NOT support CSS variables like hsl(var(--x))
+const COLOR_PRIMARY = "#4f98a3";   // matches --color-primary dark mode teal
+const COLOR_ORANGE  = "#f97316";
+const COLOR_MUTED   = "#797876";
+
 function StatCard({
   label,
   value,
@@ -73,7 +78,6 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
     (l) => l.body_fat_percent !== null && l.body_fat_percent !== undefined
   );
 
-  // Explicit Number() cast — Supabase numeric columns can arrive as strings
   const chartData = sorted.map((l) => ({
     date: l.log_date.slice(5),
     weight: Number(l.weight_kg),
@@ -100,6 +104,14 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
     mealDays.length > 0
       ? Math.round(mealDays.reduce((sum, d) => sum + Number(d.calories), 0) / mealDays.length)
       : null;
+
+  const tooltipStyle = {
+    background: "#1c1b19",
+    border: "1px solid #393836",
+    borderRadius: "0.75rem",
+    fontSize: 12,
+    color: "#cdccca",
+  };
 
   return (
     <div className="space-y-8">
@@ -144,39 +156,34 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
         <h3 className="text-sm font-semibold">Weight over time</h3>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#393836" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              tick={{ fontSize: 11, fill: COLOR_MUTED }}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
               domain={["auto", "auto"]}
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              tick={{ fontSize: 11, fill: COLOR_MUTED }}
               tickLine={false}
               axisLine={false}
               width={40}
             />
             <Tooltip
-              contentStyle={{
-                background: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "0.75rem",
-                fontSize: 12,
-              }}
+              contentStyle={tooltipStyle}
               formatter={(v: number, name: string) => [
                 name === "Body fat (%)" ? `${v}%` : `${v} kg`,
                 name,
               ]}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend wrapperStyle={{ fontSize: 12, color: COLOR_MUTED }} />
 
             {targetWeightKg != null && (
               <Line
                 type="monotone"
                 dataKey="target"
-                stroke="hsl(var(--muted-foreground))"
+                stroke={COLOR_MUTED}
                 strokeDasharray="4 4"
                 strokeWidth={1.5}
                 dot={false}
@@ -188,9 +195,9 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
             <Line
               type="monotone"
               dataKey="weight"
-              stroke="hsl(var(--primary))"
+              stroke={COLOR_PRIMARY}
               strokeWidth={2}
-              dot={{ r: 3, fill: "hsl(var(--primary))" }}
+              dot={{ r: 3, fill: COLOR_PRIMARY }}
               activeDot={{ r: 5 }}
               connectNulls
               name="Weight (kg)"
@@ -200,9 +207,9 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
               <Line
                 type="monotone"
                 dataKey="bodyFat"
-                stroke="#f97316"
+                stroke={COLOR_ORANGE}
                 strokeWidth={1.5}
-                dot={{ r: 2 }}
+                dot={{ r: 2, fill: COLOR_ORANGE }}
                 connectNulls
                 name="Body fat (%)"
               />
@@ -223,35 +230,26 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
               }))}
               margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
             >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="hsl(var(--border))"
-                vertical={false}
-              />
+              <CartesianGrid strokeDasharray="3 3" stroke="#393836" vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 11, fill: COLOR_MUTED }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 11, fill: COLOR_MUTED }}
                 tickLine={false}
                 axisLine={false}
                 width={45}
               />
               <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "0.75rem",
-                  fontSize: 12,
-                }}
+                contentStyle={tooltipStyle}
                 formatter={(v: number) => [`${v} kcal`, "Calories"]}
               />
               <Bar
                 dataKey="calories"
-                fill="hsl(var(--primary))"
+                fill={COLOR_PRIMARY}
                 radius={[4, 4, 0, 0]}
                 name="Calories"
               />
