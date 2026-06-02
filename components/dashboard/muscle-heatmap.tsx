@@ -1,66 +1,17 @@
 "use client";
 
 /**
- * MuscleHeatmap
+ * MuscleHeatmap — Client Component.
  * Renders a front + back SVG body silhouette with muscle groups coloured
- * dynamically based on training frequency (sets logged in the last 7 days).
- *
- * Intensity levels (sets in last 7 days):
- *   0 → muted/grey (untrained)
- *   1-2 → light accent
- *   3-5 → medium accent
- *   6+ → strong accent
+ * by training frequency (sets logged in the last N days).
  */
 
 import { useState, useMemo } from "react";
+import { normaliseMuscle, MUSCLE_KEYS } from "@/lib/muscle-utils";
+import type { MuscleKey } from "@/lib/muscle-utils";
+import type { MuscleSetCount } from "@/lib/muscle-heatmap-data";
 
-export type MuscleSetCount = {
-  /** Normalised muscle group key – matches MUSCLE_KEYS below */
-  muscle: string;
-  /** Total completed sets in the period */
-  sets: number;
-};
-
-// Canonical keys used throughout the app (lowercase, from exercise_library.muscle_group)
-export const MUSCLE_KEYS = [
-  "chest",
-  "back",
-  "shoulders",
-  "biceps",
-  "triceps",
-  "forearms",
-  "core",
-  "abs",
-  "quads",
-  "hamstrings",
-  "glutes",
-  "calves",
-  "traps",
-  "lats",
-] as const;
-
-type MuscleKey = (typeof MUSCLE_KEYS)[number];
-
-/** Normalise raw muscle_group strings from DB to canonical keys */
-export function normaliseMuscle(raw: string | null): MuscleKey | null {
-  if (!raw) return null;
-  const g = raw.toLowerCase().trim();
-  if (g.includes("chest") || g.includes("pec")) return "chest";
-  if (g.includes("lats") || g.includes("lat ")) return "lats";
-  if (g.includes("back") || g.includes("rhomboid") || g.includes("row")) return "back";
-  if (g.includes("trap")) return "traps";
-  if (g.includes("shoulder") || g.includes("delt") || g.includes("ohp")) return "shoulders";
-  if (g.includes("bicep")) return "biceps";
-  if (g.includes("tricep")) return "triceps";
-  if (g.includes("forearm")) return "forearms";
-  if (g.includes("abs") || g.includes("crunch")) return "abs";
-  if (g.includes("core") || g.includes("plank")) return "core";
-  if (g.includes("quad")) return "quads";
-  if (g.includes("hamstring") || g.includes("rdl")) return "hamstrings";
-  if (g.includes("glute") || g.includes("hip")) return "glutes";
-  if (g.includes("calf") || g.includes("calves")) return "calves";
-  return null;
-}
+export type { MuscleSetCount };
 
 function intensityClass(sets: number): string {
   if (sets === 0) return "fill-muted stroke-border";
@@ -71,25 +22,20 @@ function intensityClass(sets: number): string {
 
 function intensityLabel(sets: number): string {
   if (sets === 0) return "Not trained";
-  if (sets <= 2) return `${sets} set${sets > 1 ? "s" : ""} – light`;
-  if (sets <= 5) return `${sets} sets – moderate`;
-  return `${sets} sets – heavy`;
+  if (sets <= 2) return `${sets} set${sets > 1 ? "s" : ""} \u2013 light`;
+  if (sets <= 5) return `${sets} sets \u2013 moderate`;
+  return `${sets} sets \u2013 heavy`;
 }
 
 type MusclePath = {
   key: MuscleKey;
   label: string;
-  /** "front" | "back" view */
   view: "front" | "back";
   d: string;
 };
 
-/**
- * SVG paths for a simplified body silhouette.
- * viewBox: 0 0 120 260 for each half.
- */
 const MUSCLE_PATHS: MusclePath[] = [
-  // ─── FRONT ───────────────────────────────────────────────────────────────
+  // FRONT
   { key: "chest", label: "Chest", view: "front", d: "M38,72 Q60,80 82,72 Q82,92 60,96 Q38,92 38,72Z" },
   { key: "shoulders", label: "Shoulders", view: "front", d: "M22,62 Q32,54 38,72 Q28,78 20,72 Z" },
   { key: "shoulders", label: "Shoulders", view: "front", d: "M98,62 Q88,54 82,72 Q92,78 100,72 Z" },
@@ -102,8 +48,7 @@ const MUSCLE_PATHS: MusclePath[] = [
   { key: "quads", label: "Quads", view: "front", d: "M76,138 Q68,140 64,160 Q68,176 74,180 Q82,168 80,150 Z" },
   { key: "calves", label: "Calves", view: "front", d: "M44,186 Q48,196 46,212 Q42,214 40,204 Q38,194 42,186 Z" },
   { key: "calves", label: "Calves", view: "front", d: "M76,186 Q72,196 74,212 Q78,214 80,204 Q82,194 78,186 Z" },
-
-  // ─── BACK ────────────────────────────────────────────────────────────────
+  // BACK
   { key: "traps", label: "Traps", view: "back", d: "M44,56 Q60,62 76,56 Q76,68 60,72 Q44,68 44,56Z" },
   { key: "lats", label: "Lats", view: "back", d: "M38,72 Q44,68 58,96 Q48,100 38,92 Z" },
   { key: "lats", label: "Lats", view: "back", d: "M82,72 Q76,68 62,96 Q72,100 82,92 Z" },
@@ -130,27 +75,19 @@ const BODY_OUTLINE = `
   Q98,110 96,90 Q104,74 100,60 Q88,48 76,44 Q72,36 68,28 Z
 `;
 
-type HeatmapSVGProps = {
+function HeatmapSVG({
+  view,
+  setsMap,
+  onHover,
+}: {
   view: "front" | "back";
   setsMap: Map<MuscleKey, number>;
   onHover: (label: string | null) => void;
-};
-
-function HeatmapSVG({ view, setsMap, onHover }: HeatmapSVGProps) {
+}) {
   const paths = MUSCLE_PATHS.filter((p) => p.view === view);
-
   return (
-    <svg
-      viewBox="0 0 120 240"
-      className="w-full h-full"
-      aria-label={`${view} body muscle heatmap`}
-    >
-      <path
-        d={BODY_OUTLINE}
-        className="fill-muted/30 stroke-border"
-        strokeWidth="1"
-        fillRule="evenodd"
-      />
+    <svg viewBox="0 0 120 240" className="w-full h-full" aria-label={`${view} body muscle heatmap`}>
+      <path d={BODY_OUTLINE} className="fill-muted/30 stroke-border" strokeWidth="1" fillRule="evenodd" />
       {paths.map((mp, i) => {
         const sets = setsMap.get(mp.key) ?? 0;
         return (
@@ -165,21 +102,13 @@ function HeatmapSVG({ view, setsMap, onHover }: HeatmapSVGProps) {
           />
         );
       })}
-      <text
-        x="60"
-        y="232"
-        textAnchor="middle"
-        className="fill-muted-foreground"
-        fontSize="7"
-        fontFamily="system-ui"
-      >
+      <text x="60" y="232" textAnchor="middle" className="fill-muted-foreground" fontSize="7" fontFamily="system-ui">
         {view === "front" ? "FRONT" : "BACK"}
       </text>
     </svg>
   );
 }
 
-/** Inner component that holds tooltip state */
 function MuscleHeatmapView({
   view,
   setsMap,
@@ -188,7 +117,6 @@ function MuscleHeatmapView({
   setsMap: Map<MuscleKey, number>;
 }) {
   const [tooltip, setTooltip] = useState<string | null>(null);
-
   return (
     <div className="relative">
       <div className="aspect-[1/2]">
@@ -203,12 +131,7 @@ function MuscleHeatmapView({
   );
 }
 
-type Props = {
-  /** Array of { muscle, sets } for the last N days */
-  data: MuscleSetCount[];
-};
-
-export function MuscleHeatmap({ data }: Props) {
+export function MuscleHeatmap({ data }: { data: MuscleSetCount[] }) {
   const setsMap = useMemo(() => {
     const map = new Map<MuscleKey, number>();
     for (const entry of data) {
@@ -228,8 +151,6 @@ export function MuscleHeatmap({ data }: Props) {
         <MuscleHeatmapView view="front" setsMap={setsMap} />
         <MuscleHeatmapView view="back" setsMap={setsMap} />
       </div>
-
-      {/* Legend */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">

@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normaliseMuscle, type MuscleSetCount } from "@/components/dashboard/muscle-heatmap";
+import { normaliseMuscle } from "@/lib/muscle-utils";
+
+export type MuscleSetCount = {
+  muscle: string;
+  sets: number;
+};
 
 /**
  * Fetches muscle group set counts for a user in the last `days` days.
- * Uses the new workout system: workout_sessions → workout_session_exercises → workout_set_logs
- *   + exercise_library for muscle_group.
- *
- * Returns an array of { muscle, sets } ready for MuscleHeatmap.
+ * Server-safe — no client imports.
  */
 export async function loadMuscleHeatmapData(
   supabase: SupabaseClient,
@@ -28,7 +30,7 @@ export async function loadMuscleHeatmapData(
   if (!sessions || sessions.length === 0) return [];
   const sessionIds = sessions.map((s) => s.id);
 
-  // Step 2: workout_session_exercises for those sessions
+  // Step 2: workout_session_exercises
   const { data: wseRows } = await supabase
     .from("workout_session_exercises")
     .select("id, exercise_id")
@@ -38,7 +40,7 @@ export async function loadMuscleHeatmapData(
   const wseIds = wseRows.map((w) => w.id);
   const exerciseIds = Array.from(new Set(wseRows.map((w) => w.exercise_id as string)));
 
-  // Step 3: exercise_library for muscle groups
+  // Step 3: exercise_library muscle groups
   const { data: exercises } = await supabase
     .from("exercise_library")
     .select("id, muscle_group")
