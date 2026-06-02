@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { startWorkoutFromTemplate } from "@/app/workouts/templates/actions";
+import { startWorkoutFromTemplate } from "@/app/templates/actions";
 
 export function StartWorkoutFromTemplateForm({ templateId }: { templateId: string }) {
   const [isPending, startTransition] = useTransition();
