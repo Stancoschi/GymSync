@@ -27,15 +27,10 @@ type LoggedSet = {
   is_pr: boolean;
 };
 
-/** One set from the previous session for the same exercise */
-type LastSet = {
-  set_number: number;
-  reps: number;
-  weight_kg: number;
-};
-
-/** Map of exercise_library_id → ordered sets from last session */
+type LastSet = { set_number: number; reps: number; weight_kg: number };
 export type LastSessionMap = Record<string, LastSet[]>;
+
+// ─── helpers ────────────────────────────────────────────────────────────────
 
 function getExLib(ex: Exercise) {
   return Array.isArray(ex.exercise_library)
@@ -56,10 +51,10 @@ function formatTime(seconds: number) {
 }
 
 /**
- * Decide smart rest duration based on intensity.
- * Heavy  (weight >= 85% estimated max OR RIR <= 1) → 180s
- * Medium (RIR 2-3)                                 → 120s
- * Light  (everything else)                         → 90s
+ * Smart rest suggestion:
+ * - If the set is heavy relative to the user's best (≥85% e1RM), suggest 3 min
+ * - If RIR was 0-1 (close to failure), suggest 2 min
+ * - Otherwise default 90 s
  */
 function smartRestSeconds(
   weight: number,
@@ -67,67 +62,70 @@ function smartRestSeconds(
   rir: number | null,
   prBaseline: { weight_kg: number; reps: number } | null
 ): number {
-  if (rir !== null && rir <= 1) return 180;
-  if (rir !== null && rir <= 3) return 120;
   if (prBaseline) {
-    const max1rm = calc1RM(prBaseline.weight_kg, prBaseline.reps);
-    const intensity = weight / (max1rm / (1 + 1 / 30)); // rough % of 1RM
-    if (intensity >= 0.85) return 180;
-    if (intensity >= 0.70) return 120;
+    const best1RM = calc1RM(prBaseline.weight_kg, prBaseline.reps);
+    const set1RM = calc1RM(weight, reps);
+    if (set1RM / best1RM >= 0.85) return 180;
   }
-  // high reps = metabolic, shorter rest needed less often
-  if (reps >= 15) return 90;
-  return 120;
+  if (rir !== null && rir <= 1) return 120;
+  return 90;
 }
 
-type SetDelta = "pr" | "better" | "same" | "worse" | "first";
-
-function getSetDelta(
+/**
+ * Delta badge between current set and the matching set from last session.
+ * Returns null if there's no reference data.
+ */
+function computeDelta(
   weight: number,
   reps: number,
-  lastSet: LastSet | null,
-  isPr: boolean
-): SetDelta {
-  if (isPr) return "pr";
-  if (!lastSet) return "first";
-  const newE = calc1RM(weight, reps);
-  const oldE = calc1RM(lastSet.weight_kg, lastSet.reps);
-  const diff = newE - oldE;
-  if (diff > 0.5) return "better";
-  if (diff < -0.5) return "worse";
-  return "same";
+  lastSet: LastSet | undefined
+): { label: string; positive: boolean; neutral: boolean } | null {
+  if (!lastSet) return null;
+  const wDiff = weight - lastSet.weight_kg;
+  const rDiff = reps - lastSet.reps;
+  if (wDiff === 0 && rDiff === 0)
+    return { label: "= same load", positive: false, neutral: true };
+  const parts: string[] = [];
+  if (wDiff !== 0) parts.push(`${wDiff > 0 ? "+" : ""}${wDiff} kg`);
+  if (rDiff !== 0) parts.push(`${rDiff > 0 ? "+" : ""}${rDiff} rep${Math.abs(rDiff) !== 1 ? "s" : ""}`);
+  return {
+    label: parts.join(" · "),
+    positive: wDiff > 0 || (wDiff === 0 && rDiff > 0),
+    neutral: false,
+  };
 }
 
-const DELTA_STYLES: Record<SetDelta, string> = {
-  pr: "bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300/40",
-  better: "bg-green-50 dark:bg-green-950/20 border border-green-300/30",
-  same: "bg-muted/40",
-  worse: "bg-red-50/60 dark:bg-red-950/10 border border-red-300/20",
-  first: "bg-muted/40",
-};
-
-const DELTA_BADGE: Record<SetDelta, string | null> = {
-  pr: "🏆 PR",
-  better: null, // shown via inline diff
-  same: null,
-  worse: null,
-  first: "★ First",
-};
+/**
+ * Overload suggestion for the next set.
+ * If there's a last session set for this set number, suggest a small increment.
+ */
+function overloadSuggestion(
+  setNumber: number,
+  lastSets: LastSet[],
+  loadIncrement: number | null
+): { weight: number; reps: number } | null {
+  const ref = lastSets.find((s) => s.set_number === setNumber);
+  if (!ref) return null;
+  const inc = loadIncrement ?? 2.5;
+  return { weight: ref.weight_kg + inc, reps: ref.reps };
+}
 
 const REST_PRESETS = [60, 90, 120, 180];
+
+// ─── component ──────────────────────────────────────────────────────────────
 
 export function LiveSessionClient({
   templateId,
   templateName,
   exercises,
   prMap,
-  lastSessionMap,
+  lastSessionMap = {},
 }: {
   templateId: string;
   templateName: string;
   exercises: Exercise[];
   prMap: Record<string, { weight_kg: number; reps: number }>;
-  lastSessionMap: LastSessionMap;
+  lastSessionMap?: LastSessionMap;
   userId: string;
 }) {
   const [currentExIdx, setCurrentExIdx] = useState(0);
@@ -150,7 +148,7 @@ export function LiveSessionClient({
   // Rest timer
   const [restSeconds, setRestSeconds] = useState(0);
   const [restActive, setRestActive] = useState(false);
-  const [restTotal, setRestTotal] = useState(90);
+  const [suggestedRest, setSuggestedRest] = useState(90);
   const restRef = useRef(0);
   const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -158,7 +156,6 @@ export function LiveSessionClient({
     if (restIntervalRef.current) clearInterval(restIntervalRef.current);
     restRef.current = seconds;
     setRestSeconds(seconds);
-    setRestTotal(seconds);
     setRestActive(true);
     restIntervalRef.current = setInterval(() => {
       restRef.current -= 1;
@@ -197,16 +194,51 @@ export function LiveSessionClient({
 
   const prBaseline = exLib ? prMap[exLib.id] ?? null : null;
   const lastSets: LastSet[] = exLib ? (lastSessionMap[exLib.id] ?? []) : [];
+  const nextSetNumber = currentExSets.length + 1;
+  const suggestion = overloadSuggestion(
+    nextSetNumber,
+    lastSets,
+    currentEx?.load_increment ?? null
+  );
 
-  // Next set index (0-based) — used to look up last session reference
-  const nextSetIdx = currentExSets.length;
-  const lastSetRef: LastSet | null = lastSets[nextSetIdx] ?? null;
+  // Volume comparison for current exercise
+  const currentVolume = currentExSets.reduce(
+    (acc, s) => acc + s.weight_kg * s.reps,
+    0
+  );
+  const lastVolume = lastSets.reduce(
+    (acc, s) => acc + s.weight_kg * s.reps,
+    0
+  );
+  const volumeDiff = lastVolume > 0 ? currentVolume - lastVolume : null;
 
-  // Suggested load: last session weight + load_increment (default +0)
-  const suggestedWeight =
-    lastSetRef !== null
-      ? lastSetRef.weight_kg + (currentEx?.load_increment ?? 0)
-      : null;
+  // Pre-fill inputs from suggestion when moving to a new set
+  const lastPrefillRef = useRef<number>(-1);
+  useEffect(() => {
+    if (
+      suggestion &&
+      nextSetNumber !== lastPrefillRef.current &&
+      weight === "" &&
+      reps === ""
+    ) {
+      setWeight(String(suggestion.weight));
+      setReps(String(suggestion.reps));
+      lastPrefillRef.current = nextSetNumber;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextSetNumber, exLib?.id]);
+
+  // Clear inputs when switching exercise
+  const prevExIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (exLib?.id !== prevExIdRef.current) {
+      setWeight("");
+      setReps("");
+      setRir("");
+      lastPrefillRef.current = -1;
+      prevExIdRef.current = exLib?.id;
+    }
+  }, [exLib?.id]);
 
   function logSet() {
     if (!exLib) return;
@@ -216,13 +248,14 @@ export function LiveSessionClient({
     const rirVal = rir !== "" ? parseInt(rir, 10) : null;
     const setNumber = currentExSets.length + 1;
 
+    // PR check vs all-time best
     let is_pr = false;
     if (prBaseline) {
       const new1rm = calc1RM(w, r);
       const old1rm = calc1RM(prBaseline.weight_kg, prBaseline.reps);
       if (new1rm > old1rm) is_pr = true;
     } else {
-      is_pr = true;
+      is_pr = true; // first time doing this exercise
     }
 
     setLoggedSets((prev) => [
@@ -238,12 +271,15 @@ export function LiveSessionClient({
       },
     ]);
 
-    const smart = smartRestSeconds(w, r, rirVal, prBaseline);
-    startRest(smart);
+    // Smart rest timer
+    const restTime = smartRestSeconds(w, r, rirVal, prBaseline);
+    setSuggestedRest(restTime);
+    startRest(restTime);
 
-    // Pre-fill next set with same values as convenience
-    setWeight(String(w));
-    setReps(String(r));
+    // Clear inputs for next set
+    setWeight("");
+    setReps("");
+    setRir("");
   }
 
   const newPrs = Array.from(
@@ -314,6 +350,7 @@ export function LiveSessionClient({
         {/* Current exercise card */}
         {currentEx && exLib && (
           <div className="rounded-2xl border bg-card p-5 space-y-4">
+            {/* Header */}
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold">{exLib.name}</h2>
@@ -333,35 +370,52 @@ export function LiveSessionClient({
               </div>
             </div>
 
-            {/* Baseline row: PR best + last session reference side by side */}
-            <div className="grid grid-cols-2 gap-2">
-              {prBaseline && (
-                <div className="rounded-xl bg-muted/50 px-3 py-2 space-y-0.5">
-                  <p className="text-xs text-muted-foreground">All-time best</p>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {prBaseline.weight_kg} kg × {prBaseline.reps} reps
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {calc1RM(prBaseline.weight_kg, prBaseline.reps).toFixed(1)}{" "}
-                    kg est. 1RM
-                  </p>
+            {/* All-time PR baseline */}
+            {prBaseline && (
+              <div className="rounded-xl bg-muted/50 px-3 py-2 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">All-time best</span>
+                <span className="font-medium">
+                  {prBaseline.weight_kg} kg × {prBaseline.reps} reps
+                  <span className="text-xs text-muted-foreground ml-1.5">
+                    (est. 1RM {calc1RM(prBaseline.weight_kg, prBaseline.reps).toFixed(1)} kg)
+                  </span>
+                </span>
+              </div>
+            )}
+
+            {/* Last session sets reference */}
+            {lastSets.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Last session
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {lastSets.map((ls) => (
+                    <span
+                      key={ls.set_number}
+                      className="text-xs rounded-lg bg-muted/60 px-2.5 py-1 tabular-nums"
+                    >
+                      #{ls.set_number} · {ls.weight_kg} kg × {ls.reps}
+                    </span>
+                  ))}
                 </div>
-              )}
-              {lastSetRef && (
-                <div className="rounded-xl bg-primary/5 border border-primary/15 px-3 py-2 space-y-0.5">
-                  <p className="text-xs text-primary/70">Last session set {nextSetIdx + 1}</p>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {lastSetRef.weight_kg} kg × {lastSetRef.reps} reps
+                {/* Volume delta */}
+                {currentVolume > 0 && volumeDiff !== null && (
+                  <p
+                    className={`text-xs font-medium mt-1 ${
+                      volumeDiff >= 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-500"
+                    }`}
+                  >
+                    Volume: {currentVolume} kg total
+                    {volumeDiff >= 0
+                      ? ` (+${volumeDiff} vs last)`
+                      : ` (${volumeDiff} vs last)`}
                   </p>
-                  {suggestedWeight !== null &&
-                    suggestedWeight !== lastSetRef.weight_kg && (
-                      <p className="text-xs text-primary font-medium">
-                        Suggested: {suggestedWeight} kg
-                      </p>
-                    )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {currentEx.notes && (
               <p className="text-xs text-muted-foreground italic">
@@ -373,17 +427,17 @@ export function LiveSessionClient({
             {currentExSets.length > 0 && (
               <div className="space-y-1.5">
                 {currentExSets.map((s, i) => {
-                  const ref = lastSets[i] ?? null;
-                  const delta = getSetDelta(s.weight_kg, s.reps, ref, s.is_pr);
-                  const weightDiff =
-                    ref !== null ? s.weight_kg - ref.weight_kg : null;
-                  const repsDiff =
-                    ref !== null ? s.reps - ref.reps : null;
+                  const refSet = lastSets.find(
+                    (ls) => ls.set_number === s.set_number
+                  );
+                  const delta = computeDelta(s.weight_kg, s.reps, refSet);
                   return (
                     <div
                       key={i}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
-                        DELTA_STYLES[delta]
+                        s.is_pr
+                          ? "bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300/40"
+                          : "bg-muted/40"
                       }`}
                     >
                       <span className="w-6 text-center text-xs font-mono text-muted-foreground">
@@ -393,33 +447,22 @@ export function LiveSessionClient({
                         {s.weight_kg} kg × {s.reps} reps
                         {s.rir !== null ? ` · RIR ${s.rir}` : ""}
                       </span>
-                      {/* Inline delta vs last session */}
-                      {ref !== null && delta !== "pr" && delta !== "first" && (
+                      {delta && (
                         <span
-                          className={`text-xs font-medium ${
-                            delta === "better"
+                          className={`text-xs font-medium shrink-0 ${
+                            delta.neutral
+                              ? "text-muted-foreground"
+                              : delta.positive
                               ? "text-green-600 dark:text-green-400"
-                              : delta === "worse"
-                              ? "text-red-500 dark:text-red-400"
-                              : "text-muted-foreground"
+                              : "text-red-500"
                           }`}
                         >
-                          {weightDiff !== null && weightDiff !== 0
-                            ? `${weightDiff > 0 ? "+" : ""}${weightDiff}kg`
-                            : repsDiff !== null && repsDiff !== 0
-                            ? `${repsDiff > 0 ? "+" : ""}${repsDiff}r`
-                            : "="}
+                          {delta.label}
                         </span>
                       )}
-                      {DELTA_BADGE[delta] && (
-                        <span
-                          className={`text-xs font-bold ${
-                            delta === "pr"
-                              ? "text-yellow-600 dark:text-yellow-400"
-                              : "text-primary"
-                          }`}
-                        >
-                          {DELTA_BADGE[delta]}
+                      {s.is_pr && (
+                        <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400 shrink-0">
+                          🏆 PR
                         </span>
                       )}
                     </div>
@@ -428,46 +471,56 @@ export function LiveSessionClient({
               </div>
             )}
 
-            {/* Input row */}
+            {/* Input area */}
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground font-medium">
-                Set {currentExSets.length + 1} of {targetSets}
-                {setsLeft > 0 ? ` · ${setsLeft} left` : " · All sets done"}
-                {lastSetRef && (
-                  <span className="ml-2 text-primary/70">
-                    (last: {lastSetRef.weight_kg}kg × {lastSetRef.reps}r)
-                  </span>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground font-medium">
+                  Set {nextSetNumber} of {targetSets}
+                  {setsLeft > 0 ? ` · ${setsLeft} left` : " · All sets done"}
+                </p>
+                {/* Overload suggestion chip */}
+                {suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWeight(String(suggestion.weight));
+                      setReps(String(suggestion.reps));
+                    }}
+                    className="text-xs rounded-full border border-primary/40 bg-primary/8 text-primary px-2.5 py-1 hover:bg-primary/15 transition-colors tabular-nums"
+                    title="Click to apply suggestion"
+                  >
+                    ↑ Try {suggestion.weight} kg × {suggestion.reps}
+                  </button>
                 )}
-              </p>
+              </div>
               <div className="grid grid-cols-3 gap-2">
-                {[
+                {([
                   {
                     label: "Weight (kg)",
                     value: weight,
                     setter: setWeight,
-                    placeholder:
-                      suggestedWeight !== null
-                        ? String(suggestedWeight)
-                        : lastSetRef
-                        ? String(lastSetRef.weight_kg)
-                        : "60",
+                    placeholder: suggestion ? String(suggestion.weight) : "60",
                   },
                   {
                     label: "Reps",
                     value: reps,
                     setter: setReps,
-                    placeholder: lastSetRef ? String(lastSetRef.reps) : "8",
+                    placeholder: suggestion ? String(suggestion.reps) : "8",
                   },
                   {
                     label: "RIR",
                     value: rir,
                     setter: setRir,
-                    placeholder:
-                      currentEx.target_rir !== null
-                        ? String(currentEx.target_rir)
-                        : "2",
+                    placeholder: currentEx.target_rir !== null
+                      ? String(currentEx.target_rir)
+                      : "2",
                   },
-                ].map(({ label, value, setter, placeholder }) => (
+                ] as Array<{
+                  label: string;
+                  value: string;
+                  setter: (v: string) => void;
+                  placeholder: string;
+                }>).map(({ label, value, setter, placeholder }) => (
                   <div key={label} className="space-y-1">
                     <label className="text-xs text-muted-foreground">
                       {label}
@@ -500,13 +553,12 @@ export function LiveSessionClient({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-primary">Rest timer</p>
-                <p className="text-xs text-muted-foreground">
-                  {restTotal === 180
-                    ? "Heavy set · 3 min rest"
-                    : restTotal === 120
-                    ? "Moderate · 2 min rest"
-                    : "Light · 90s rest"}
-                </p>
+                {suggestedRest === 180 && (
+                  <p className="text-xs text-muted-foreground">Heavy set — 3 min recommended</p>
+                )}
+                {suggestedRest === 120 && (
+                  <p className="text-xs text-muted-foreground">Close to failure — 2 min recommended</p>
+                )}
               </div>
               <button
                 onClick={cancelRest}
@@ -522,7 +574,7 @@ export function LiveSessionClient({
               <div
                 className="h-full rounded-full bg-primary transition-all duration-1000"
                 style={{
-                  width: `${Math.max(0, (restSeconds / restTotal) * 100)}%`,
+                  width: `${Math.max(0, (restSeconds / suggestedRest) * 100)}%`,
                 }}
               />
             </div>
@@ -571,7 +623,9 @@ export function LiveSessionClient({
           disabled={submitting || loggedSets.length === 0}
           className="w-full max-w-lg mx-auto block rounded-2xl bg-primary text-primary-foreground py-4 text-base font-bold disabled:opacity-40 transition-opacity active:scale-[0.98]"
         >
-          {submitting ? "Saving…" : `Finish workout ${newPrs.length > 0 ? "🏆" : "✓"}`}
+          {submitting
+            ? "Saving…"
+            : `Finish workout ${newPrs.length > 0 ? "🏆" : "✓"}`}
         </button>
       </div>
     </div>
