@@ -36,12 +36,12 @@ export async function startWorkoutFromTemplate(formData: FormData) {
     (a: any, b: any) => a.sort_order - b.sort_order
   );
 
-  // 2. Create workout_session
+  // 2. Create workout_session using the original workout_template_id FK
   const { data: session, error: sessionError } = await supabase
     .from("workout_sessions")
     .insert({
       user_id: user.id,
-      template_id: templateId,
+      workout_template_id: templateId,
       status: "in_progress",
       started_at: new Date().toISOString(),
     })
