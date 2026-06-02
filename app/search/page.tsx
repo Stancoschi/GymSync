@@ -8,6 +8,15 @@ export const metadata: Metadata = { title: "Search" };
 
 const MAX_RESULTS = 8;
 
+type GymInfo = { name: string; city: string | null };
+
+type SessionResult = {
+  id: string;
+  title: string;
+  scheduled_for: string;
+  gyms: GymInfo | GymInfo[] | null;
+};
+
 export default async function SearchPage({
   searchParams,
 }: {
@@ -23,7 +32,7 @@ export default async function SearchPage({
   const q = (params.q ?? "").trim();
 
   let users: { id: string; username: string | null; full_name: string | null; city: string | null }[] = [];
-  let sessions: { id: string; title: string; scheduled_for: string; gyms: { name: string; city: string | null } | null }[] = [];
+  let sessions: SessionResult[] = [];
   let exercises: { id: string; name: string; muscle_group: string | null }[] = [];
 
   if (q.length >= 2) {
@@ -54,7 +63,7 @@ export default async function SearchPage({
     ]);
 
     users = (usersRes.data ?? []) as typeof users;
-    sessions = (sessionsRes.data ?? []) as typeof sessions;
+    sessions = (sessionsRes.data ?? []) as unknown as SessionResult[];
     exercises = (exercisesRes.data ?? []) as typeof exercises;
   }
 
