@@ -38,12 +38,15 @@ export async function signup(formData: FormData) {
   const { error } = await supabase.auth.signUp(data);
 
   if (error) {
-    redirect(`/auth/login?message=${encodeURIComponent(error.message)}`);
+    redirect(`/auth/register?message=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath("/", "layout");
   redirect("/onboarding");
 }
+
+// Alias used by register-form.tsx
+export const register = signup;
 
 export async function logout() {
   const supabase = await createClient();

@@ -100,29 +100,18 @@ function buildVolumeChartData(workouts: Array<{ workout_date: string }>) {
   return Array.from(weekMap.values()).map(({ label, count }) => ({ week: label, count }));
 }
 
-/** Build day-by-day data for the heatmap — last N weeks */
 function buildHeatmapData(
   workouts: Array<{ workout_date: string }>,
   weeks: number
 ): Array<{ date: string; count: number }> {
-  // Count workouts per day
+  void weeks;
   const dayMap = new Map<string, number>();
   for (const w of workouts) {
-    const ymd = w.workout_date.split("T")[0]; // ensure YYYY-MM-DD
+    const ymd = w.workout_date.split("T")[0];
     dayMap.set(ymd, (dayMap.get(ymd) ?? 0) + 1);
   }
-  // Return only days that have workouts (heatmap builds the full grid itself)
   return Array.from(dayMap.entries()).map(([date, count]) => ({ date, count }));
 }
-
-type RawPerformanceSet = {
-  reps: unknown;
-  weight_kg: unknown;
-  workout_session_exercises: Array<{
-    exercises: Array<{ name: string }>;
-    workout_sessions: Array<{ completed_at: string }>;
-  }>;
-};
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -138,7 +127,7 @@ export default async function DashboardPage() {
     profileResult, latestWeightResult, workoutsCountResult,
     recentWorkoutsCountResult, mealsCountResult, sessionsCreatedCountResult,
     sessionsJoinedCountResult, recentWorkoutsResult, recentBodyLogsResult,
-    recentSessionsResult, allWorkoutsForStreakResult, performanceSetsResult,
+    recentSessionsResult, allWorkoutsForStreakResult,
     weightLogsForChartResult, workoutsForVolumeResult, workoutsForHeatmapResult,
   ] = await Promise.all([
     supabase.from("profiles").select(`username, full_name, goal, onboarding_completed, activity_level, training_days_per_week, experience_level, preferred_gym_id, target_weight_kg`).eq("id", user.id).single(),
@@ -152,7 +141,6 @@ export default async function DashboardPage() {
     supabase.from("body_logs").select("id, log_date, weight_kg, body_fat_percent").order("log_date", { ascending: false }).limit(5),
     supabase.from("gym_sessions").select(`id, title, scheduled_for, max_participants, gyms ( name, city )`).order("scheduled_for", { ascending: true }).limit(5),
     supabase.from("workouts").select("workout_date").order("workout_date", { ascending: false }),
-    supabase.from("workout_set_logs").select(`reps, weight_kg, workout_session_exercises ( exercise_id, exercises ( name ), workout_sessions ( completed_at ) )`).eq("completed", true).not("weight_kg", "is", null).not("reps", "is", null).eq("workout_session_exercises.workout_sessions.user_id", user.id).limit(200),
     supabase.from("body_logs").select("log_date, weight_kg").gte("log_date", last8Weeks).order("log_date", { ascending: false }).limit(30),
     supabase.from("workouts").select("workout_date").gte("workout_date", last6Weeks),
     supabase.from("workouts").select("workout_date").gte("workout_date", last16Weeks),
@@ -171,7 +159,6 @@ export default async function DashboardPage() {
   const recentBodyLogs = (recentBodyLogsResult.data ?? []) as BodyLogRow[];
   const recentSessions = (recentSessionsResult.data ?? []) as unknown as GymSessionRow[];
   const allWorkoutsForStreak = allWorkoutsForStreakResult.data ?? [];
-  const performanceSets = (performanceSetsResult.data ?? []) as unknown as RawPerformanceSet[];
 
   const weightChartData = buildWeightChartData(weightLogsForChartResult.data ?? []);
   const volumeChartData = buildVolumeChartData(workoutsForVolumeResult.data ?? []);
@@ -183,22 +170,87 @@ export default async function DashboardPage() {
 
   const workoutWeekStreak = calculateWorkoutWeekStreak(allWorkoutsForStreak);
 
-  const prMap = new Map<string, PrHighlight>();
-  for (const set of performanceSets) {
-    const weArr = Array.isArray(set.workout_session_exercises) ? set.workout_session_exercises : [];
-    const we = weArr[0];
-    if (!we) continue;
-    const exerciseName = Array.isArray(we.exercises) ? we.exercises[0]?.name : undefined;
-    const workoutDate = Array.isArray(we.workout_sessions) ? we.workout_sessions[0]?.completed_at : undefined;
-    const reps = Number(set.reps);
-    const weight = Number(set.weight_kg);
-    if (!exerciseName || !workoutDate || !reps || !weight) continue;
-    const estimated1RM = calculateEstimated1RM(weight, reps);
-    const existing = prMap.get(exerciseName);
-    if (!existing || estimated1RM > existing.estimated1RM)
-      prMap.set(exerciseName, { exerciseName, weight, reps, estimated1RM, workoutDate });
-  }
-  const prHighlights = Array.from(prMap.values()).sort((a, b) => b.estimated1RM - a.estimated1RM).slice(0, 5);
+  // ─── PR Highlights: 3 separate queries ───────────────────────────────────────────────────────
+  // PostgREST silently returns 0 rows when filtering on nested join columns
+  // (e.g. .eq("workout_session_exercises.workout_sessions.user_id", id)).
+  // Solution: resolve user session IDs first, then chain two more queries.
+  // workout_session_exercises.exercise_id → exercise_library (not exercises).
+  // ────────────────────────────────────────────────────────────────────────────────
+  const prHighlights: PrHighlight[] = await (async () => {
+    // Step 1: get this user's completed workout_session IDs
+    const { data: userSessions } = await supabase
+      .from("workout_sessions")
+      .select("id, completed_at")
+      .eq("user_id", user.id)
+      .eq("status", "completed");
+
+    if (!userSessions || userSessions.length === 0) return [];
+
+    const sessionIds = userSessions.map((s) => s.id);
+    const sessionDateMap = new Map<string, string>(
+      userSessions.map((s) => [s.id, s.completed_at as string])
+    );
+
+    // Step 2: get workout_session_exercises + exercise name.
+    // FK is exercise_library, NOT exercises.
+    const { data: wseRows } = await supabase
+      .from("workout_session_exercises")
+      .select("id, workout_session_id, exercise_id, exercise_library ( name )")
+      .in("workout_session_id", sessionIds);
+
+    if (!wseRows || wseRows.length === 0) return [];
+
+    const wseIds = wseRows.map((w) => w.id);
+    const wseMetaMap = new Map<string, { exerciseName: string; completedAt: string }>();
+    for (const wse of wseRows) {
+      const exerciseName = Array.isArray(wse.exercise_library)
+        ? (wse.exercise_library[0] as { name: string } | undefined)?.name
+        : (wse.exercise_library as { name: string } | null)?.name;
+      const completedAt = sessionDateMap.get(wse.workout_session_id as string);
+      if (exerciseName && completedAt) {
+        wseMetaMap.set(wse.id, { exerciseName, completedAt });
+      }
+    }
+
+    if (wseMetaMap.size === 0) return [];
+
+    // Step 3: get completed set logs with weight + reps
+    const { data: setLogs } = await supabase
+      .from("workout_set_logs")
+      .select("reps, weight_kg, workout_session_exercise_id")
+      .in("workout_session_exercise_id", wseIds)
+      .eq("completed", true)
+      .not("weight_kg", "is", null)
+      .not("reps", "is", null)
+      .limit(500);
+
+    if (!setLogs || setLogs.length === 0) return [];
+
+    // Build per-exercise best estimated 1RM (Epley formula)
+    const prMap = new Map<string, PrHighlight>();
+    for (const set of setLogs) {
+      const meta = wseMetaMap.get(set.workout_session_exercise_id as string);
+      if (!meta) continue;
+      const reps = Number(set.reps);
+      const weight = Number(set.weight_kg);
+      if (!reps || !weight) continue;
+      const estimated1RM = calculateEstimated1RM(weight, reps);
+      const existing = prMap.get(meta.exerciseName);
+      if (!existing || estimated1RM > existing.estimated1RM) {
+        prMap.set(meta.exerciseName, {
+          exerciseName: meta.exerciseName,
+          weight,
+          reps,
+          estimated1RM,
+          workoutDate: meta.completedAt,
+        });
+      }
+    }
+
+    return Array.from(prMap.values())
+      .sort((a, b) => b.estimated1RM - a.estimated1RM)
+      .slice(0, 5);
+  })();
 
   const preferredGym = preferredGymResult.data;
   const currentWeightValue = latestWeight?.weight_kg ? Number(latestWeight.weight_kg) : null;

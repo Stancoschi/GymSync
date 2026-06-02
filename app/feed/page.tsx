@@ -45,7 +45,7 @@ export default async function FeedPage({
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data: friendships, error: friendshipsError } = await supabase
+  const { data: friendships } = await supabase
     .from("friendships")
     .select("user_a_id, user_b_id")
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
@@ -57,7 +57,6 @@ export default async function FeedPage({
       if (!friendIds.includes(otherId)) friendIds.push(otherId);
     }
   }
-  // Include self in feed
   if (!friendIds.includes(user.id)) friendIds.push(user.id);
 
   if (friendIds.length === 0) {
@@ -80,7 +79,6 @@ export default async function FeedPage({
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  // --- Enrich workout items with has_pr flag ---
   const workoutItemIds = (rawItems ?? [])
     .filter((i: any) => i.type === "workout")
     .map((i: any) => i.id);
@@ -102,7 +100,6 @@ export default async function FeedPage({
     has_pr: item.type === "workout" ? prWorkoutIds.has(item.id) : false,
   }));
 
-  // Count total for pagination
   const { count } = await supabase
     .from("feed_items")
     .select("id", { count: "exact", head: true })
@@ -120,71 +117,73 @@ export default async function FeedPage({
         </p>
       ) : (
         <div className="space-y-4">
-          {feedItems.map((item) => (
-            <div key={item.id} className="rounded-2xl border p-4 space-y-4">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm">{item.actor_name}</p>
-                    {item.actor_username && (
-                      <Link
-                        href={`/profile/${item.actor_username}`}
-                        className="text-xs text-muted-foreground hover:underline"
-                      >
-                        @{item.actor_username}
-                      </Link>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(item.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* PR badge */}
-                  {item.has_pr && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/20 px-2.5 py-0.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
-                      🏆 PR
-                    </span>
-                  )}
-                  <span className="text-xs rounded-md bg-muted px-2 py-1">
-                    {item.type}
-                  </span>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div>
-                <p className="font-medium">{item.title}</p>
-                <p className="text-sm text-muted-foreground">{item.subtitle}</p>
-              </div>
-
-              {/* Reactions + Comments */}
-              <div className="flex items-center gap-3">
-                <ReactionButton
-                  id={item.id}
-                  count={item.reaction_count}
-                  reacted={item.reacted_by_me}
-                />
-              </div>
-              <CommentForm id={item.id} />
-              {item.comments.length > 0 && (
-                <div className="space-y-2 border-t pt-3">
-                  {item.comments.map((c) => (
-                    <div key={c.id} className="text-sm">
-                      <span className="font-medium">{c.author_name}</span>{" "}
-                      <span className="text-muted-foreground">{c.content}</span>
+          {feedItems.map((item) => {
+            const itemType = item.type === "workout" ? "workout" : "session";
+            return (
+              <div key={item.id} className="rounded-2xl border p-4 space-y-4">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm">{item.actor_name}</p>
+                      {item.actor_username && (
+                        <Link
+                          href={`/profile/${item.actor_username}`}
+                          className="text-xs text-muted-foreground hover:underline"
+                        >
+                          @{item.actor_username}
+                        </Link>
+                      )}
                     </div>
-                  ))}
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {item.has_pr && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/20 px-2.5 py-0.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+                        🏆 PR
+                      </span>
+                    )}
+                    <span className="text-xs rounded-md bg-muted px-2 py-1">
+                      {item.type}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Content */}
+                <div>
+                  <p className="font-medium">{item.title}</p>
+                  <p className="text-sm text-muted-foreground">{item.subtitle}</p>
+                </div>
+
+                {/* Reactions + Comments */}
+                <div className="flex items-center gap-3">
+                  <ReactionButton
+                    itemType={itemType}
+                    itemId={item.id}
+                    count={item.reaction_count}
+                    reacted={item.reacted_by_me}
+                  />
+                </div>
+                <CommentForm itemType={itemType} itemId={item.id} />
+                {item.comments.length > 0 && (
+                  <div className="space-y-2 border-t pt-3">
+                    {item.comments.map((c) => (
+                      <div key={c.id} className="text-sm">
+                        <span className="font-medium">{c.author_name}</span>{" "}
+                        <span className="text-muted-foreground">{c.content}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           {page > 1 ? (

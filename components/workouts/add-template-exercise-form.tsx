@@ -21,8 +21,8 @@ export function AddTemplateExerciseForm({
 }) {
   return (
     <form action={addTemplateExercise} className="space-y-4">
-      <input type="hidden" name="workout_template_id" value={workoutTemplateId} />
-      <input type="hidden" name="order_index" value={nextOrderIndex} />
+      <input type="hidden" name="workout_template_id" value={workoutTemplateId ?? ""} />
+      <input type="hidden" name="order_index" value={nextOrderIndex ?? 1} />
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Exercise</label>

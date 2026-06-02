@@ -90,16 +90,6 @@ export async function finishWorkoutSession(formData: FormData) {
 
   // 4. Notify friends about PRs
   if (newPrs.length > 0) {
-    const prText = newPrs.join(", ");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name, username")
-      .eq("id", user.id)
-      .single();
-
-    const name = profile?.full_name ?? profile?.username ?? "Someone";
-
     const { data: friendships } = await supabase
       .from("friendships")
       .select("user_a_id, user_b_id")
@@ -110,12 +100,10 @@ export async function finishWorkoutSession(formData: FormData) {
     );
 
     for (const friendId of friendIds) {
-      await createNotification(supabase, {
-        user_id: friendId,
+      await createNotification({
+        userId: friendId,
         type: "pr_achieved",
-        title: `${name} hit a new PR! 🏆`,
-        body: `New personal record on ${prText}`,
-        link: `/profile/${user.id}`,
+        actorId: user.id,
       });
     }
   }

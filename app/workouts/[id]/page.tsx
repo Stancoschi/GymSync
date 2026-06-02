@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AddTemplateExerciseForm } from "@/components/workouts/add-template-exercise-form";
-import { loadPrBaselines, calc1RM } from "@/lib/pr-tracker";
+import { loadPrBaselines } from "@/lib/pr-tracker";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Workout" };
@@ -26,12 +26,39 @@ export default async function WorkoutTemplateDetailsPage({
     redirect("/auth/login");
   }
 
-  const { data: template, error: templateError } = await supabase
-    .from("workout_templates")
-    .select("id, name, description, user_id")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
+  const [{ data: template, error: templateError }, { data: templateExercises }, { data: allExercises }] =
+    await Promise.all([
+      supabase
+        .from("workout_templates")
+        .select("id, name, description, user_id")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single(),
+      supabase
+        .from("workout_template_exercises")
+        .select(`
+          id,
+          order_index,
+          target_sets,
+          min_reps,
+          max_reps,
+          target_rir,
+          load_increment,
+          notes,
+          exercise_library:exercise_id (
+            id,
+            name,
+            muscle_group,
+            equipment
+          )
+        `)
+        .eq("workout_template_id", id)
+        .order("order_index"),
+      supabase
+        .from("exercise_library")
+        .select("id, name, muscle_group, equipment")
+        .order("name"),
+    ]);
 
   if (templateError || !template) {
     return (
@@ -42,27 +69,6 @@ export default async function WorkoutTemplateDetailsPage({
       </main>
     );
   }
-
-  const { data: templateExercises, error: exercisesError } = await supabase
-    .from("workout_template_exercises")
-    .select(`
-      id,
-      order_index,
-      target_sets,
-      min_reps,
-      max_reps,
-      target_rir,
-      load_increment,
-      notes,
-      exercise_library:exercise_id (
-        id,
-        name,
-        muscle_group,
-        equipment
-      )
-    `)
-    .eq("workout_template_id", id)
-    .order("order_index");
 
   // --- PR baselines per exercise ---
   const exerciseIds: string[] = [];
@@ -76,6 +82,8 @@ export default async function WorkoutTemplateDetailsPage({
   }
 
   const prBaselines = await loadPrBaselines(supabase, user.id, exerciseIds);
+  const nextOrderIndex = (templateExercises?.length ?? 0) + 1;
+  const exerciseList = allExercises ?? [];
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-6">
@@ -95,12 +103,18 @@ export default async function WorkoutTemplateDetailsPage({
             </p>
           )}
         </div>
-        <Link
-          href={`/workouts/${id}/session`}
-          className="shrink-0 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-        >
-          Start workout
-        </Link>
+        {(templateExercises?.length ?? 0) > 0 ? (
+          <Link
+            href={`/workouts/${id}/session`}
+            className="shrink-0 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Start workout
+          </Link>
+        ) : (
+          <span className="shrink-0 rounded-xl bg-muted px-5 py-2.5 text-sm font-semibold text-muted-foreground cursor-not-allowed">
+            Start workout
+          </span>
+        )}
       </div>
 
       {/* Exercise list */}
@@ -183,7 +197,7 @@ export default async function WorkoutTemplateDetailsPage({
           </div>
         ) : (
           <div className="rounded-xl border p-4 text-sm text-muted-foreground">
-            No exercises added yet.
+            No exercises added yet. Use the form below to add exercises.
           </div>
         )}
       </section>
@@ -191,7 +205,11 @@ export default async function WorkoutTemplateDetailsPage({
       {/* Add exercise */}
       <section>
         <h2 className="mb-3 text-lg font-semibold">Add exercise</h2>
-        <AddTemplateExerciseForm templateId={id} />
+        <AddTemplateExerciseForm
+          workoutTemplateId={id}
+          exercises={exerciseList}
+          nextOrderIndex={nextOrderIndex}
+        />
       </section>
 
       <div className="flex gap-3">
