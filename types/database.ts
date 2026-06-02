@@ -81,7 +81,11 @@ export interface SessionParticipant {
   profiles: { full_name: string | null; username: string | null } | null;
 }
 
-export type NotificationType = 'friend_request' | 'friend_accepted' | 'session_joined';
+export type NotificationType =
+  | 'friend_request'
+  | 'friend_accepted'
+  | 'session_joined'
+  | 'pr_achieved';
 
 export interface NotificationRow {
   id: string;
