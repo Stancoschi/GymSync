@@ -42,7 +42,7 @@ export async function startWorkoutFromTemplate(formData: FormData) {
     .insert({
       user_id: user.id,
       template_id: templateId,
-      status: "active",
+      status: "in_progress",
       started_at: new Date().toISOString(),
     })
     .select("id")
