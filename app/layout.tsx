@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Suspense } from "react";
 import { ToastWrapper } from "@/components/ui/toast-wrapper";
 import { ThemeInit } from "@/components/layout/theme-init";
 
@@ -15,6 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
@@ -37,7 +43,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "GymSync",
   },
 };
@@ -50,17 +56,26 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      // SSR fallback: 'dark' ensures correct colors before ThemeInit runs on client.
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
-        {/* Runs synchronously before any CSS — prevents flash of wrong theme */}
         <ThemeInit />
+        {/* iOS Safari PWA meta tags */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="GymSync" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
       </head>
       <body className="min-h-full flex flex-col">
         {children}
-        <ToastWrapper />
+        {/* Suspense required: useSearchParams() inside ToastWrapper */}
+        <Suspense fallback={null}>
+          <ToastWrapper />
+        </Suspense>
       </body>
     </html>
   );

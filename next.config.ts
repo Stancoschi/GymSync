@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Silence Turbopack warning (no webpack config needed)
+  turbopack: {},
 };
 
 export default nextConfig;
