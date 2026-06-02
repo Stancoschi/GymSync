@@ -175,12 +175,15 @@ export default async function DashboardPage() {
   // 0 rows. We resolve the user's session IDs first, then join from there.
   // ────────────────────────────────────────────────────────────────────────────────
   const prHighlights: PrHighlight[] = await (async () => {
-    // Step 1: get this user's workout_session IDs
-    const { data: userSessions } = await supabase
+    // [DEBUG] Step 1: get this user's workout_session IDs
+    console.log("[PR-DEBUG] user.id:", user.id);
+    const { data: userSessions, error: sessErr } = await supabase
       .from("workout_sessions")
       .select("id, completed_at")
       .eq("user_id", user.id)
       .eq("status", "completed");
+    console.log("[PR-DEBUG] Step1 sessErr:", sessErr);
+    console.log("[PR-DEBUG] Step1 userSessions count:", userSessions?.length ?? 0);
 
     if (!userSessions || userSessions.length === 0) return [];
 
@@ -190,11 +193,14 @@ export default async function DashboardPage() {
       userSessions.map((s) => [s.id, s.completed_at as string])
     );
 
-    // Step 2: get workout_session_exercises + exercise name for those sessions
-    const { data: wseRows } = await supabase
+    // [DEBUG] Step 2: get workout_session_exercises + exercise name for those sessions
+    const { data: wseRows, error: wseErr } = await supabase
       .from("workout_session_exercises")
       .select("id, workout_session_id, exercise_id, exercises ( name )")
       .in("workout_session_id", sessionIds);
+    console.log("[PR-DEBUG] Step2 wseErr:", wseErr);
+    console.log("[PR-DEBUG] Step2 wseRows count:", wseRows?.length ?? 0);
+    console.log("[PR-DEBUG] Step2 wseRows[0]:", JSON.stringify(wseRows?.[0]));
 
     if (!wseRows || wseRows.length === 0) return [];
 
@@ -209,13 +215,15 @@ export default async function DashboardPage() {
         ? (wse.exercises[0] as { name: string } | undefined)?.name
         : (wse.exercises as { name: string } | null)?.name;
       const completedAt = sessionDateMap.get(wse.workout_session_id as string);
+      console.log("[PR-DEBUG] wse.id:", wse.id, "exerciseName:", exerciseName, "completedAt:", completedAt);
       if (exerciseName && completedAt) {
         wseMetaMap.set(wse.id, { exerciseName, completedAt });
       }
     }
+    console.log("[PR-DEBUG] wseMetaMap size:", wseMetaMap.size);
 
-    // Step 3: get completed set logs for those WSE IDs
-    const { data: setLogs } = await supabase
+    // [DEBUG] Step 3: get completed set logs for those WSE IDs
+    const { data: setLogs, error: setErr } = await supabase
       .from("workout_set_logs")
       .select("reps, weight_kg, workout_session_exercise_id")
       .in("workout_session_exercise_id", wseIds)
@@ -223,6 +231,9 @@ export default async function DashboardPage() {
       .not("weight_kg", "is", null)
       .not("reps", "is", null)
       .limit(500);
+    console.log("[PR-DEBUG] Step3 setErr:", setErr);
+    console.log("[PR-DEBUG] Step3 setLogs count:", setLogs?.length ?? 0);
+    console.log("[PR-DEBUG] Step3 setLogs[0]:", JSON.stringify(setLogs?.[0]));
 
     if (!setLogs || setLogs.length === 0) return [];
 
@@ -230,6 +241,7 @@ export default async function DashboardPage() {
     const prMap = new Map<string, PrHighlight>();
     for (const set of setLogs) {
       const meta = wseMetaMap.get(set.workout_session_exercise_id as string);
+      console.log("[PR-DEBUG] set wseId:", set.workout_session_exercise_id, "meta:", meta);
       if (!meta) continue;
       const reps = Number(set.reps);
       const weight = Number(set.weight_kg);
@@ -246,6 +258,9 @@ export default async function DashboardPage() {
         });
       }
     }
+
+    console.log("[PR-DEBUG] prMap size:", prMap.size);
+    console.log("[PR-DEBUG] prHighlights:", JSON.stringify(Array.from(prMap.values())));
 
     return Array.from(prMap.values())
       .sort((a, b) => b.estimated1RM - a.estimated1RM)
