@@ -4,9 +4,10 @@
   "description": "Train together. Track everything.",
   "start_url": "/dashboard",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
-  "orientation": "portrait-primary",
+  "categories": ["fitness", "health", "sports"],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -22,6 +23,21 @@
     }
   ],
   "screenshots": [],
-  "categories": ["fitness", "health", "lifestyle"],
-  "lang": "en"
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard",
+      "description": "Go to your dashboard"
+    },
+    {
+      "name": "Start workout",
+      "url": "/workouts",
+      "description": "Start a new workout"
+    },
+    {
+      "name": "Nutrition",
+      "url": "/nutrition",
+      "description": "Log meals and body metrics"
+    }
+  ]
 }
