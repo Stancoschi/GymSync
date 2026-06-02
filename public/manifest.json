@@ -1,43 +1,18 @@
 {
   "name": "GymSync",
   "short_name": "GymSync",
-  "description": "Train together. Track everything.",
+  "description": "Track workouts, connect with friends, hit PRs.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
-  "categories": ["fitness", "health", "sports"],
+  "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
-  "screenshots": [],
-  "shortcuts": [
-    {
-      "name": "Dashboard",
-      "url": "/dashboard",
-      "description": "Go to your dashboard"
-    },
-    {
-      "name": "Start workout",
-      "url": "/workouts",
-      "description": "Start a new workout"
-    },
-    {
-      "name": "Nutrition",
-      "url": "/nutrition",
-      "description": "Log meals and body metrics"
-    }
-  ]
+  "screenshots": [
+    { "src": "/icons/screenshot-mobile.png", "sizes": "390x844", "type": "image/png", "form_factor": "narrow" }
+  ],
+  "categories": ["health", "fitness", "sports"]
 }
