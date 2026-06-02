@@ -65,27 +65,31 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
     );
   }
 
-  // Sort ascending for charts
+  // Sort ascending for charts — keep all entries, weight is guaranteed non-null (filtered below)
   const sorted = [...bodyLogs]
     .filter((l) => l.weight_kg !== null)
     .sort((a, b) => a.log_date.localeCompare(b.log_date));
 
+  const hasBf = sorted.some((l) => l.body_fat_percent !== null);
+
+  // Use null (not undefined) so Recharts knows the key exists but has no value.
+  // connectNulls on each Line handles the gaps.
   const chartData = sorted.map((l) => ({
     date: l.log_date.slice(5), // MM-DD
-    weight: l.weight_kg,
-    bodyFat: l.body_fat_percent ?? undefined,
-    target: targetWeightKg ?? undefined,
+    weight: l.weight_kg as number,
+    bodyFat: l.body_fat_percent !== null ? l.body_fat_percent : null,
+    target: targetWeightKg ?? null,
   }));
 
   const latest = sorted[sorted.length - 1];
   const first = sorted[0];
   const delta =
-    latest && first && latest.weight_kg !== null && first.weight_kg !== null
-      ? +(latest.weight_kg - first.weight_kg).toFixed(1)
+    latest && first
+      ? +(latest.weight_kg! - first.weight_kg!).toFixed(1)
       : null;
 
   const latestBf =
-    bodyLogs
+    [...bodyLogs]
       .filter((l) => l.body_fat_percent !== null)
       .sort((a, b) => b.log_date.localeCompare(a.log_date))[0]?.body_fat_percent ?? null;
 
@@ -150,7 +154,6 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
               tickLine={false}
               axisLine={false}
               width={40}
-              tickFormatter={(v) => `${v}`}
             />
             <Tooltip
               contentStyle={{
@@ -159,19 +162,28 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
                 borderRadius: "0.75rem",
                 fontSize: 12,
               }}
-              formatter={(v: number) => [`${v} kg`, "Weight"]}
+              formatter={(v: number, name: string) => [
+                name === "Body fat (%)" ? `${v}%` : `${v} kg`,
+                name,
+              ]}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
+
+            {/* Target line — always null-safe, connectNulls draws it continuously */}
             {targetWeightKg && (
               <Line
                 type="monotone"
                 dataKey="target"
                 stroke="hsl(var(--muted-foreground))"
                 strokeDasharray="4 4"
+                strokeWidth={1.5}
                 dot={false}
+                connectNulls
                 name="Target"
               />
             )}
+
+            {/* Weight — connectNulls ensures the line is never broken */}
             <Line
               type="monotone"
               dataKey="weight"
@@ -179,17 +191,20 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
               strokeWidth={2}
               dot={{ r: 3, fill: "hsl(var(--primary))" }}
               activeDot={{ r: 5 }}
+              connectNulls
               name="Weight (kg)"
             />
-            {chartData.some((d) => d.bodyFat !== undefined) && (
+
+            {/* Body fat — only rendered if at least one entry has it */}
+            {hasBf && (
               <Line
                 type="monotone"
                 dataKey="bodyFat"
-                stroke="hsl(var(--color-orange, 220 60% 60%))"
+                stroke="#f97316"
                 strokeWidth={1.5}
                 dot={{ r: 2 }}
+                connectNulls
                 name="Body fat (%)"
-                yAxisId={0}
               />
             )}
           </LineChart>
