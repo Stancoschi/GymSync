@@ -1,13 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normaliseMuscle } from "@/lib/muscle-utils";
+import { normaliseMuscle, getSecondaryContributions } from "@/lib/muscle-utils";
+import type { MuscleKey } from "@/lib/muscle-utils";
 
 export type MuscleSetCount = {
   muscle: string;
+  /** Primary completed sets */
   sets: number;
+  /** Secondary weighted contribution (from compound exercises) */
+  secondarySets: number;
 };
 
 /**
  * Fetches muscle group set counts for a user in the last `days` days.
+ * Primary sets = direct sets on that muscle.
+ * Secondary sets = compound carry-over from other muscles (weighted).
  * Server-safe — no client imports.
  */
 export async function loadMuscleHeatmapData(
@@ -50,10 +56,11 @@ export async function loadMuscleHeatmapData(
     (exercises ?? []).map((e) => [e.id, e.muscle_group])
   );
 
-  // Map wse_id → muscle_group
-  const wseMuscleMap = new Map<string, string | null>();
+  // Map wse_id → normalised MuscleKey
+  const wseMuscleMap = new Map<string, MuscleKey | null>();
   for (const wse of wseRows) {
-    wseMuscleMap.set(wse.id, exMuscleMap.get(wse.exercise_id as string) ?? null);
+    const raw = exMuscleMap.get(wse.exercise_id as string) ?? null;
+    wseMuscleMap.set(wse.id, normaliseMuscle(raw));
   }
 
   // Step 4: completed set logs
@@ -65,14 +72,31 @@ export async function loadMuscleHeatmapData(
 
   if (!setLogs || setLogs.length === 0) return [];
 
-  // Count sets per muscle
-  const muscleSetCount = new Map<string, number>();
+  // Count primary sets per muscle
+  const primaryMap = new Map<MuscleKey, number>();
   for (const log of setLogs) {
-    const rawMuscle = wseMuscleMap.get(log.workout_session_exercise_id as string);
-    const key = normaliseMuscle(rawMuscle ?? null);
+    const key = wseMuscleMap.get(log.workout_session_exercise_id as string);
     if (!key) continue;
-    muscleSetCount.set(key, (muscleSetCount.get(key) ?? 0) + 1);
+    primaryMap.set(key, (primaryMap.get(key) ?? 0) + 1);
   }
 
-  return Array.from(muscleSetCount.entries()).map(([muscle, sets]) => ({ muscle, sets }));
+  // Build secondary contributions from compound carry-over
+  const secondaryMap = new Map<MuscleKey, number>();
+  for (const [primaryKey, primarySets] of primaryMap.entries()) {
+    for (const { muscle, sets } of getSecondaryContributions(primaryKey, primarySets)) {
+      secondaryMap.set(muscle, (secondaryMap.get(muscle) ?? 0) + sets);
+    }
+  }
+
+  // Merge: every muscle that has primary OR secondary data
+  const allMuscles = new Set<MuscleKey>([
+    ...primaryMap.keys(),
+    ...secondaryMap.keys(),
+  ]);
+
+  return Array.from(allMuscles).map((muscle) => ({
+    muscle,
+    sets: primaryMap.get(muscle) ?? 0,
+    secondarySets: secondaryMap.get(muscle) ?? 0,
+  }));
 }
