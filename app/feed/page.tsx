@@ -45,7 +45,7 @@ export default async function FeedPage({
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data: friendships, error: friendshipsError } = await supabase
+  const { data: friendships } = await supabase
     .from("friendships")
     .select("user_a_id, user_b_id")
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
@@ -57,7 +57,6 @@ export default async function FeedPage({
       if (!friendIds.includes(otherId)) friendIds.push(otherId);
     }
   }
-  // Include self in feed
   if (!friendIds.includes(user.id)) friendIds.push(user.id);
 
   if (friendIds.length === 0) {
@@ -80,7 +79,6 @@ export default async function FeedPage({
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  // --- Enrich workout items with has_pr flag ---
   const workoutItemIds = (rawItems ?? [])
     .filter((i: any) => i.type === "workout")
     .map((i: any) => i.id);
@@ -102,7 +100,6 @@ export default async function FeedPage({
     has_pr: item.type === "workout" ? prWorkoutIds.has(item.id) : false,
   }));
 
-  // Count total for pagination
   const { count } = await supabase
     .from("feed_items")
     .select("id", { count: "exact", head: true })
@@ -142,7 +139,6 @@ export default async function FeedPage({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* PR badge */}
                   {item.has_pr && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/20 px-2.5 py-0.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
                       🏆 PR
@@ -163,7 +159,8 @@ export default async function FeedPage({
               {/* Reactions + Comments */}
               <div className="flex items-center gap-3">
                 <ReactionButton
-                  id={item.id}
+                  itemType={item.type === "workout" ? "workout" : "session"}
+                  itemId={item.id}
                   count={item.reaction_count}
                   reacted={item.reacted_by_me}
                 />
@@ -184,7 +181,6 @@ export default async function FeedPage({
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           {page > 1 ? (
