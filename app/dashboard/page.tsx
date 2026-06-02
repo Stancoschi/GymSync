@@ -6,6 +6,8 @@ import { getSessionGym } from "@/types/database";
 import { WeightChart } from "@/components/dashboard/weight-chart";
 import { WorkoutVolumeChart } from "@/components/dashboard/workout-volume-chart";
 import { WorkoutHeatmap } from "@/components/dashboard/workout-heatmap";
+import { MuscleHeatmap } from "@/components/dashboard/muscle-heatmap";
+import { loadMuscleHeatmapData } from "@/lib/muscle-heatmap-data";
 
 function startOfLast7Days() {
   const date = new Date();
@@ -164,20 +166,17 @@ export default async function DashboardPage() {
   const volumeChartData = buildVolumeChartData(workoutsForVolumeResult.data ?? []);
   const heatmapData = buildHeatmapData(workoutsForHeatmapResult.data ?? [], 16);
 
+  // Muscle group heatmap data (last 7 days)
+  const muscleHeatmapData = await loadMuscleHeatmapData(supabase, user.id, 7);
+
   const preferredGymResult = profile?.preferred_gym_id
     ? await supabase.from("gyms").select("id, name, city").eq("id", profile.preferred_gym_id).maybeSingle()
     : { data: null };
 
   const workoutWeekStreak = calculateWorkoutWeekStreak(allWorkoutsForStreak);
 
-  // ─── PR Highlights: 3 separate queries ───────────────────────────────────────────────────────
-  // PostgREST silently returns 0 rows when filtering on nested join columns
-  // (e.g. .eq("workout_session_exercises.workout_sessions.user_id", id)).
-  // Solution: resolve user session IDs first, then chain two more queries.
-  // workout_session_exercises.exercise_id → exercise_library (not exercises).
-  // ────────────────────────────────────────────────────────────────────────────────
+  // ─── PR Highlights: 3 separate queries ────────────────────────────────────
   const prHighlights: PrHighlight[] = await (async () => {
-    // Step 1: get this user's completed workout_session IDs
     const { data: userSessions } = await supabase
       .from("workout_sessions")
       .select("id, completed_at")
@@ -191,8 +190,6 @@ export default async function DashboardPage() {
       userSessions.map((s) => [s.id, s.completed_at as string])
     );
 
-    // Step 2: get workout_session_exercises + exercise name.
-    // FK is exercise_library, NOT exercises.
     const { data: wseRows } = await supabase
       .from("workout_session_exercises")
       .select("id, workout_session_id, exercise_id, exercise_library ( name )")
@@ -214,7 +211,6 @@ export default async function DashboardPage() {
 
     if (wseMetaMap.size === 0) return [];
 
-    // Step 3: get completed set logs with weight + reps
     const { data: setLogs } = await supabase
       .from("workout_set_logs")
       .select("reps, weight_kg, workout_session_exercise_id")
@@ -226,7 +222,6 @@ export default async function DashboardPage() {
 
     if (!setLogs || setLogs.length === 0) return [];
 
-    // Build per-exercise best estimated 1RM (Epley formula)
     const prMap = new Map<string, PrHighlight>();
     for (const set of setLogs) {
       const meta = wseMetaMap.get(set.workout_session_exercise_id as string);
@@ -346,6 +341,20 @@ export default async function DashboardPage() {
             <p className="text-xs font-medium">{preferredGym?.name ?? "No preferred gym"}</p>
             <p className="text-xs text-muted-foreground">{preferredGym?.city ?? "Set one in profile settings"}</p>
           </div>
+        </div>
+      </section>
+
+      {/* Muscle Group Heatmap */}
+      <section>
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Muscle map</h2>
+            <span className="text-xs text-muted-foreground">Last 7 days</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Hover a muscle group to see training volume. Colour intensity = sets logged.
+          </p>
+          <MuscleHeatmap data={muscleHeatmapData} />
         </div>
       </section>
 
