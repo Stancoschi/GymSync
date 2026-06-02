@@ -10,7 +10,17 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Silence Turbopack warning (no webpack config needed)
+
+  // Allow external dev tunnels (ngrok, localtunnel, LAN access)
+  // Next.js 15 blocks requests from non-localhost origins by default.
+  allowedDevOrigins: [
+    "*.ngrok-free.app",
+    "*.ngrok.io",
+    "*.ngrok.app",
+    "192.168.*",
+    "10.*",
+  ],
+
   turbopack: {},
 };
 
