@@ -11,7 +11,7 @@ const navItems = [
   { href: "/feed", label: "Feed", icon: "◈" },
   { href: "/friends", label: "Friends", icon: "◌" },
   { href: "/challenges", label: "Challenges", icon: "◆" },
-  { href: "/search", label: "Search", icon: "○" },
+  { href: "/profile", label: "Profile", icon: "○" },
 ];
 
 export function SidebarNav() {
@@ -24,7 +24,6 @@ export function SidebarNav() {
           item.href === "/dashboard"
             ? pathname === "/dashboard"
             : pathname.startsWith(item.href);
-
         return (
           <Link
             key={item.href}
@@ -47,34 +46,36 @@ export function SidebarNav() {
 export function BottomNav() {
   const pathname = usePathname();
 
-  // Bottom nav shows: Dashboard, Workouts, Sessions, Feed, Search
   const bottomItems = [
-    navItems[0], // Dashboard
-    navItems[1], // Workouts
-    navItems[3], // Sessions
-    navItems[4], // Feed
-    navItems[7], // Search
+    { href: "/dashboard", label: "Dashboard", icon: "⊞" },
+    { href: "/workouts", label: "Workouts", icon: "◈" },
+    { href: "/sessions", label: "Sessions", icon: "◎" },
+    { href: "/feed", label: "Feed", icon: "◈" },
+    { href: "/profile", label: "Profile", icon: "○" },
   ];
 
+  // Hide BottomNav during live workout session (it covers the Finish button)
+  if (pathname.includes("/session")) return null;
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-sidebar border-t border-border flex items-center justify-around px-2 py-2">
+    <nav
+      className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-sidebar border-t border-border flex items-center justify-around px-1"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       {bottomItems.map((item) => {
         const isActive =
           item.href === "/dashboard"
             ? pathname === "/dashboard"
             : pathname.startsWith(item.href);
-
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors ${
-              isActive
-                ? "text-primary"
-                : "text-sidebar-foreground hover:text-primary"
+            className={`flex flex-col items-center gap-0.5 px-3 py-3 rounded-lg transition-colors min-w-[56px] min-h-[56px] justify-center ${
+              isActive ? "text-primary" : "text-sidebar-foreground"
             }`}
           >
-            <span className="text-lg leading-none">{item.icon}</span>
+            <span className="text-xl leading-none">{item.icon}</span>
             <span className="text-[10px] font-medium">{item.label}</span>
           </Link>
         );
