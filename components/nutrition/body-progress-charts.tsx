@@ -65,37 +65,40 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
     );
   }
 
-  // Sort ascending for charts — keep all entries, weight is guaranteed non-null (filtered below)
   const sorted = [...bodyLogs]
-    .filter((l) => l.weight_kg !== null)
+    .filter((l) => l.weight_kg !== null && l.weight_kg !== undefined)
     .sort((a, b) => a.log_date.localeCompare(b.log_date));
 
-  const hasBf = sorted.some((l) => l.body_fat_percent !== null);
+  const hasBf = sorted.some(
+    (l) => l.body_fat_percent !== null && l.body_fat_percent !== undefined
+  );
 
-  // Use null (not undefined) so Recharts knows the key exists but has no value.
-  // connectNulls on each Line handles the gaps.
+  // Explicit Number() cast — Supabase numeric columns can arrive as strings
   const chartData = sorted.map((l) => ({
-    date: l.log_date.slice(5), // MM-DD
-    weight: l.weight_kg as number,
-    bodyFat: l.body_fat_percent !== null ? l.body_fat_percent : null,
-    target: targetWeightKg ?? null,
+    date: l.log_date.slice(5),
+    weight: Number(l.weight_kg),
+    bodyFat:
+      l.body_fat_percent !== null && l.body_fat_percent !== undefined
+        ? Number(l.body_fat_percent)
+        : null,
+    target: targetWeightKg != null ? Number(targetWeightKg) : null,
   }));
 
   const latest = sorted[sorted.length - 1];
   const first = sorted[0];
   const delta =
     latest && first
-      ? +(latest.weight_kg! - first.weight_kg!).toFixed(1)
+      ? +(Number(latest.weight_kg) - Number(first.weight_kg)).toFixed(1)
       : null;
 
   const latestBf =
     [...bodyLogs]
-      .filter((l) => l.body_fat_percent !== null)
+      .filter((l) => l.body_fat_percent !== null && l.body_fat_percent !== undefined)
       .sort((a, b) => b.log_date.localeCompare(a.log_date))[0]?.body_fat_percent ?? null;
 
   const avgCalories =
     mealDays.length > 0
-      ? Math.round(mealDays.reduce((sum, d) => sum + d.calories, 0) / mealDays.length)
+      ? Math.round(mealDays.reduce((sum, d) => sum + Number(d.calories), 0) / mealDays.length)
       : null;
 
   return (
@@ -104,7 +107,7 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard
           label="Current weight"
-          value={latest?.weight_kg ? `${latest.weight_kg} kg` : "—"}
+          value={latest?.weight_kg ? `${Number(latest.weight_kg)} kg` : "—"}
           sub={
             delta !== null
               ? `${delta > 0 ? "+" : ""}${delta} kg since start`
@@ -116,17 +119,17 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
         />
         <StatCard
           label="Target weight"
-          value={targetWeightKg ? `${targetWeightKg} kg` : "—"}
+          value={targetWeightKg ? `${Number(targetWeightKg)} kg` : "—"}
           sub={
             targetWeightKg && latest?.weight_kg
-              ? `${+(latest.weight_kg - targetWeightKg).toFixed(1)} kg to go`
+              ? `${+(Number(latest.weight_kg) - Number(targetWeightKg)).toFixed(1)} kg to go`
               : undefined
           }
           trend="neutral"
         />
         <StatCard
           label="Body fat"
-          value={latestBf !== null ? `${latestBf}%` : "—"}
+          value={latestBf !== null ? `${Number(latestBf)}%` : "—"}
         />
         <StatCard
           label="Avg calories"
@@ -169,8 +172,7 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
 
-            {/* Target line — always null-safe, connectNulls draws it continuously */}
-            {targetWeightKg && (
+            {targetWeightKg != null && (
               <Line
                 type="monotone"
                 dataKey="target"
@@ -183,7 +185,6 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
               />
             )}
 
-            {/* Weight — connectNulls ensures the line is never broken */}
             <Line
               type="monotone"
               dataKey="weight"
@@ -195,7 +196,6 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
               name="Weight (kg)"
             />
 
-            {/* Body fat — only rendered if at least one entry has it */}
             {hasBf && (
               <Line
                 type="monotone"
@@ -217,10 +217,17 @@ export function BodyProgressCharts({ bodyLogs, mealDays, targetWeightKg }: Props
           <h3 className="text-sm font-semibold">Daily calories (last 30 days)</h3>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart
-              data={mealDays.map((d) => ({ date: d.log_date.slice(5), calories: d.calories }))}
+              data={mealDays.map((d) => ({
+                date: d.log_date.slice(5),
+                calories: Number(d.calories),
+              }))}
               margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(var(--border))"
+                vertical={false}
+              />
               <XAxis
                 dataKey="date"
                 tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
