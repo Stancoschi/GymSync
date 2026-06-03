@@ -28,11 +28,12 @@ export default async function WorkoutTemplateDetailsPage({
 
   const [{ data: template, error: templateError }, { data: templateExercises }, { data: allExercises }] =
     await Promise.all([
+      // Allow own templates AND public templates
       supabase
         .from("workout_templates")
-        .select("id, name, description, user_id")
+        .select("id, name, description, user_id, is_public")
         .eq("id", id)
-        .eq("user_id", user.id)
+        .or(`user_id.eq.${user.id},is_public.eq.true`)
         .single(),
       supabase
         .from("workout_template_exercises")
@@ -70,6 +71,8 @@ export default async function WorkoutTemplateDetailsPage({
     );
   }
 
+  const isOwner = template.user_id === user.id;
+
   // --- PR baselines per exercise ---
   const exerciseIds: string[] = [];
   if (templateExercises) {
@@ -96,7 +99,14 @@ export default async function WorkoutTemplateDetailsPage({
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">{template.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">{template.name}</h1>
+            {template.is_public && !isOwner && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                public
+              </span>
+            )}
+          </div>
           {template.description && (
             <p className="mt-1 text-sm text-muted-foreground">
               {template.description}
@@ -147,7 +157,6 @@ export default async function WorkoutTemplateDetailsPage({
                       </p>
                     </div>
 
-                    {/* PR badge */}
                     {hasPr && (
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/20 px-2.5 py-0.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
@@ -197,20 +206,22 @@ export default async function WorkoutTemplateDetailsPage({
           </div>
         ) : (
           <div className="rounded-xl border p-4 text-sm text-muted-foreground">
-            No exercises added yet. Use the form below to add exercises.
+            No exercises added yet.
           </div>
         )}
       </section>
 
-      {/* Add exercise */}
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Add exercise</h2>
-        <AddTemplateExerciseForm
-          workoutTemplateId={id}
-          exercises={exerciseList}
-          nextOrderIndex={nextOrderIndex}
-        />
-      </section>
+      {/* Add exercise — only for owners */}
+      {isOwner && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Add exercise</h2>
+          <AddTemplateExerciseForm
+            workoutTemplateId={id}
+            exercises={exerciseList}
+            nextOrderIndex={nextOrderIndex}
+          />
+        </section>
+      )}
 
       <div className="flex gap-3">
         <Link
