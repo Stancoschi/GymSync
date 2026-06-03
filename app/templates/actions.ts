@@ -58,7 +58,7 @@ export async function startWorkoutFromTemplate(formData: FormData) {
     );
   }
 
-  // 3. Fetch ALL exercise_library ids by name in one query (avoids upsert RLS issues)
+  // 3. Fetch ALL exercise_library ids by name in one query
   const exerciseNames = exercises.map((ex: any) => ex.exercise_name as string);
 
   const { data: libraryExercises, error: libraryError } = await supabase
@@ -72,7 +72,6 @@ export async function startWorkoutFromTemplate(formData: FormData) {
     );
   }
 
-  // Build a name -> id map
   const nameToId = new Map<string, string>(
     libraryExercises.map((ex: any) => [ex.name, ex.id])
   );
@@ -96,7 +95,6 @@ export async function startWorkoutFromTemplate(formData: FormData) {
         max_reps: repsParsed,
         target_rir: null,
         load_increment: 2.5,
-        notes: ex.notes ?? null,
       };
     })
     .filter(Boolean);
