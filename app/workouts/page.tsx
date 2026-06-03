@@ -21,12 +21,21 @@ export default async function WorkoutsPage({
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data: templates, error, count } = await supabase
+  // Fetch own templates
+  const { data: myTemplates, error, count } = await supabase
     .from("workout_templates")
-    .select("id, name, description, created_at", { count: "exact" })
+    .select("id, name, description, created_at, user_id, is_public", { count: "exact" })
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .range(from, to);
+
+  // Fetch public templates (Jeff Nippard etc.)
+  const { data: publicTemplates } = await supabase
+    .from("workout_templates")
+    .select("id, name, description, created_at, user_id, is_public")
+    .eq("is_public", true)
+    .is("user_id", null)
+    .order("name", { ascending: true });
 
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
 
@@ -54,46 +63,71 @@ export default async function WorkoutsPage({
         </div>
       </div>
 
-      {templates && templates.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {templates.map((template: any) => (
-            <Link
-              key={template.id}
-              href={`/workouts/${template.id}`}
-              className="rounded-2xl border p-5 transition hover:bg-muted/40"
-            >
-              <h2 className="text-xl font-semibold">{template.name}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {template.description || "No description yet."}
-              </p>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-2xl border p-6 text-sm text-muted-foreground">
-          No workout templates yet. Create your first Push, Pull or Legs session.
-        </div>
+      {/* Public / Program templates */}
+      {publicTemplates && publicTemplates.length > 0 && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Programs</h2>
+            <p className="text-sm text-muted-foreground">Ready-made programs you can start immediately.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {publicTemplates.map((template: any) => (
+              <Link
+                key={template.id}
+                href={`/workouts/${template.id}`}
+                className="rounded-2xl border p-5 transition hover:bg-muted/40"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-lg font-semibold">{template.name}</h3>
+                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">public</span>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                  {template.description || "No description yet."}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
+
+      {/* My templates */}
+      <section className="space-y-4">
+        {(myTemplates?.length ?? 0) > 0 && (
+          <h2 className="text-lg font-semibold">My workouts</h2>
+        )}
+        {myTemplates && myTemplates.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {myTemplates.map((template: any) => (
+              <Link
+                key={template.id}
+                href={`/workouts/${template.id}`}
+                className="rounded-2xl border p-5 transition hover:bg-muted/40"
+              >
+                <h2 className="text-xl font-semibold">{template.name}</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {template.description || "No description yet."}
+                </p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border p-6 text-sm text-muted-foreground">
+            No workout templates yet. Create your first Push, Pull or Legs session.
+          </div>
+        )}
+      </section>
 
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
           {page > 1 && (
-            <Link
-              href={`/workouts?page=${page - 1}`}
-              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
-            >
+            <Link href={`/workouts?page=${page - 1}`} className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors">
               ← Previous
             </Link>
           )}
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
+          <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
           {page < totalPages && (
-            <Link
-              href={`/workouts?page=${page + 1}`}
-              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
-            >
+            <Link href={`/workouts?page=${page + 1}`} className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors">
               Next →
             </Link>
           )}
