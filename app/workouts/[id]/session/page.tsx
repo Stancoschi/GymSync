@@ -15,14 +15,15 @@ export default async function LiveSessionPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  // 1. Load template + exercises
+  // 1. Load template + exercises — allow own templates AND public templates
   const { data: template } = await supabase
     .from("workout_templates")
-    .select("id, name, user_id")
+    .select("id, name, user_id, is_public")
     .eq("id", id)
+    .or(`user_id.eq.${user.id},is_public.eq.true`)
     .single();
 
-  if (!template || template.user_id !== user.id) notFound();
+  if (!template) notFound();
 
   const { data: exercises } = await supabase
     .from("workout_template_exercises")
@@ -57,7 +58,6 @@ export default async function LiveSessionPage({
   const lastSessionMap: LastSessionMap = {};
 
   if (sessionIds.length > 0) {
-    // WSE rows for this user's sessions
     const { data: wseRows } = await supabase
       .from("workout_session_exercises")
       .select("id, exercise_id, workout_session_id")
@@ -75,7 +75,6 @@ export default async function LiveSessionPage({
         .not("weight_kg", "is", null)
         .not("reps", "is", null);
 
-      // Build PR map (best estimated 1RM per exercise)
       for (const log of setLogs ?? []) {
         const wse = wseRows.find((w) => w.id === log.workout_session_exercise_id);
         if (!wse) continue;
@@ -90,9 +89,6 @@ export default async function LiveSessionPage({
         }
       }
 
-      // ── Last session sets per exercise ──────────────────────────────────────
-      // Find the most recent completed session that included each exercise,
-      // then pull the ordered sets from that session only.
       const { data: recentSessions } = await supabase
         .from("workout_sessions")
         .select("id, completed_at")
@@ -103,7 +99,6 @@ export default async function LiveSessionPage({
       const recentSessionIds = (recentSessions ?? []).map((s) => s.id);
 
       for (const exId of exerciseIds) {
-        // Find the most recent WSE for this exercise
         const recentWse = recentSessionIds
           .flatMap((sid) =>
             wseRows.filter(

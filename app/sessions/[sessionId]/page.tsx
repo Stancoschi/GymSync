@@ -80,6 +80,7 @@ export default async function SessionPage({
     redirect("/auth/login");
   }
 
+  // Use explicit FK hint to avoid ambiguous relationship error
   const { data: session, error: sessionError } = await supabase
     .from("workout_sessions")
     .select(`
@@ -88,7 +89,7 @@ export default async function SessionPage({
       status,
       started_at,
       completed_at,
-      workout_templates (
+      workout_templates!workout_sessions_workout_template_id_fkey (
         id,
         name
       )
