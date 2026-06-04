@@ -4,19 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Dumbbell, Salad, CalendarDays,
-  Rss, Users, Trophy, Search, Bell, Settings
+  Rss, Users, Trophy, Search, Bell, Settings,
+  Sigma,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: "⊞" },
-  { href: "/workouts", label: "Workouts", icon: "◈" },
-  { href: "/one-rm", label: "1RM Calc", icon: "◑" },
-  { href: "/nutrition", label: "Nutrition", icon: "◉" },
-  { href: "/sessions", label: "Sessions", icon: "◎" },
-  { href: "/feed", label: "Feed", icon: "◈" },
-  { href: "/friends", label: "Friends", icon: "◌" },
-  { href: "/challenges", label: "Challenges", icon: "◆" },
-  { href: "/search", label: "Search", icon: "○" },
+const navItems: { href: string; label: string; Icon: LucideIcon }[] = [
+  { href: "/dashboard",  label: "Dashboard",  Icon: LayoutDashboard },
+  { href: "/workouts",   label: "Workouts",   Icon: Dumbbell },
+  { href: "/one-rm",     label: "1RM Calc",   Icon: Sigma },
+  { href: "/nutrition",  label: "Nutrition",  Icon: Salad },
+  { href: "/sessions",   label: "Sessions",   Icon: CalendarDays },
+  { href: "/feed",       label: "Feed",       Icon: Rss },
+  { href: "/friends",    label: "Friends",    Icon: Users },
+  { href: "/challenges", label: "Challenges", Icon: Trophy },
+  { href: "/search",     label: "Search",     Icon: Search },
 ];
 
 export function SidebarNav() {
@@ -62,11 +64,11 @@ export function BottomNav() {
   const pathname = usePathname();
 
   const bottomItems = [
-    navItems[0],
-    navItems[1],
-    navItems[3],
-    navItems[4],
-    navItems[7],
+    navItems[0], // Dashboard
+    navItems[1], // Workouts
+    navItems[3], // Nutrition
+    navItems[4], // Sessions
+    navItems[7], // Challenges
   ];
 
   return (
