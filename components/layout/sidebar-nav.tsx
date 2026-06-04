@@ -2,41 +2,54 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard, Dumbbell, Salad, CalendarDays,
+  Rss, Users, Trophy, Search, Bell, Settings
+} from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: "⊞" },
-  { href: "/workouts", label: "Workouts", icon: "◈" },
-  { href: "/nutrition", label: "Nutrition", icon: "◉" },
-  { href: "/sessions", label: "Sessions", icon: "◎" },
-  { href: "/feed", label: "Feed", icon: "◈" },
-  { href: "/friends", label: "Friends", icon: "◌" },
-  { href: "/challenges", label: "Challenges", icon: "◆" },
-  { href: "/search", label: "Search", icon: "○" },
+  { href: "/dashboard",  label: "Dashboard",  Icon: LayoutDashboard },
+  { href: "/workouts",   label: "Workouts",   Icon: Dumbbell },
+  { href: "/nutrition",  label: "Nutrition",  Icon: Salad },
+  { href: "/sessions",   label: "Sessions",   Icon: CalendarDays },
+  { href: "/feed",       label: "Feed",       Icon: Rss },
+  { href: "/friends",    label: "Friends",    Icon: Users },
+  { href: "/challenges", label: "Challenges", Icon: Trophy },
+  { href: "/search",     label: "Search",     Icon: Search },
 ];
 
 export function SidebarNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex-1 px-3 py-4 space-y-1">
-      {navItems.map((item) => {
+    <nav className="flex-1 px-3 py-3 space-y-0.5">
+      {navItems.map(({ href, label, Icon }) => {
         const isActive =
-          item.href === "/dashboard"
+          href === "/dashboard"
             ? pathname === "/dashboard"
-            : pathname.startsWith(item.href);
+            : pathname.startsWith(href);
 
         return (
           <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            key={href}
+            href={href}
+            className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
               isActive
-                ? "bg-sidebar-accent text-primary"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-primary"
+                ? "bg-primary/10 text-primary"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
             }`}
           >
-            <span className="text-base leading-none text-primary">{item.icon}</span>
-            {item.label}
+            <Icon
+              size={16}
+              strokeWidth={isActive ? 2.5 : 2}
+              className={`shrink-0 transition-colors ${
+                isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+              }`}
+            />
+            {label}
+            {isActive && (
+              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
+            )}
           </Link>
         );
       })}
@@ -47,38 +60,62 @@ export function SidebarNav() {
 export function BottomNav() {
   const pathname = usePathname();
 
-  // Bottom nav shows: Dashboard, Workouts, Sessions, Feed, Search
   const bottomItems = [
-    navItems[0], // Dashboard
-    navItems[1], // Workouts
-    navItems[3], // Sessions
-    navItems[4], // Feed
-    navItems[7], // Search
+    navItems[0],
+    navItems[1],
+    navItems[3],
+    navItems[4],
+    navItems[7],
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-sidebar border-t border-border flex items-center justify-around px-2 py-2">
-      {bottomItems.map((item) => {
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-sidebar/95 backdrop-blur-md border-t border-border flex items-center justify-around px-2 py-2 safe-area-inset-bottom">
+      {bottomItems.map(({ href, label, Icon }) => {
         const isActive =
-          item.href === "/dashboard"
+          href === "/dashboard"
             ? pathname === "/dashboard"
-            : pathname.startsWith(item.href);
+            : pathname.startsWith(href);
 
         return (
           <Link
-            key={item.href}
-            href={item.href}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors ${
+            key={href}
+            href={href}
+            className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all ${
               isActive
                 ? "text-primary"
-                : "text-sidebar-foreground hover:text-primary"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <span className="text-lg leading-none">{item.icon}</span>
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+            <span className="text-[10px] font-medium">{label}</span>
           </Link>
         );
       })}
     </nav>
+  );
+}
+
+export function SidebarFooterLinks() {
+  const pathname = usePathname();
+  return (
+    <div className="space-y-0.5">
+      {([
+        { href: "/notifications", label: "Notifications", Icon: Bell },
+        { href: "/settings",      label: "Settings",      Icon: Settings },
+      ] as const).map(({ href, label, Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+            pathname.startsWith(href)
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+          }`}
+        >
+          <Icon size={16} strokeWidth={2} className="shrink-0" />
+          {label}
+        </Link>
+      ))}
+    </div>
   );
 }
