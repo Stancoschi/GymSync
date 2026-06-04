@@ -72,6 +72,9 @@ export default async function FeedPage({
     }
   }
 
+  console.log("[feed] user:", user.id);
+  console.log("[feed] friendIds:", friendIds);
+
   // ── Feed items ─────────────────────────────────────────────────────────────
   const { data: rawItems, error: feedError } = await supabase
     .from("feed_items")
@@ -82,9 +85,9 @@ export default async function FeedPage({
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  if (feedError) {
-    console.error("[feed] query error:", feedError.message);
-  }
+  console.log("[feed] feedError:", feedError?.message ?? "none", "| code:", feedError?.code ?? "none");
+  console.log("[feed] rawItems count:", rawItems?.length ?? 0);
+  console.log("[feed] rawItems:", JSON.stringify(rawItems?.map((i: any) => ({ id: i.id, type: i.type, title: i.title, actor_id: i.actor_id }))));
 
   // ── reacted_by_me — computed from feed_reactions ───────────────────────────
   const itemIds = (rawItems ?? []).map((i: any) => i.id as string);
@@ -150,7 +153,6 @@ export default async function FeedPage({
       .limit(workoutItemIds.length * 2 + 10);
 
     const sessionIds = (sessionsWithUser ?? []).map((s) => s.id);
-
     const sessionExerciseMap = new Map<string, Map<string, ExerciseSummary>>();
 
     if (sessionIds.length > 0) {
