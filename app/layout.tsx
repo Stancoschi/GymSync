@@ -3,7 +3,6 @@ import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
 import { ToastWrapper } from "@/components/ui/toast-wrapper";
-import { ThemeInit } from "@/components/layout/theme-init";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -51,6 +50,20 @@ export const metadata: Metadata = {
   },
 };
 
+// Blocking theme script — runs synchronously before CSS is applied.
+// Inlined as a raw string so Next.js (Server Component) emits it as
+// a plain <script> tag in HTML, bypassing React client hydration entirely.
+const themeScript = `(function(){
+  try {
+    var stored = localStorage.getItem('gymsync-theme');
+    var preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    var theme = stored || preferred;
+    var html = document.documentElement;
+    html.classList.remove('dark', 'light');
+    html.classList.add(theme);
+  } catch(e) {}
+})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -63,7 +76,8 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <ThemeInit />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
