@@ -13,7 +13,6 @@ export function ShareWorkoutButton({ workoutId, isShared, workoutTitle }: Props)
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [shared, setShared] = useState(isShared);
-  const formRef = useRef<HTMLFormElement>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -36,10 +35,9 @@ export function ShareWorkoutButton({ workoutId, isShared, workoutTitle }: Props)
             : "bg-primary/10 text-primary hover:bg-primary/20"
         }`}
       >
-        {shared ? "✓ Shared" : "Share to feed"}
+        {shared ? "\u2713 Shared" : "Share to feed"}
       </button>
 
-      {/* Modal */}
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/40 backdrop-blur-sm"
@@ -57,13 +55,15 @@ export function ShareWorkoutButton({ workoutId, isShared, workoutTitle }: Props)
               </p>
             </div>
 
-            <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {/* Required hidden fields */}
               <input type="hidden" name="workout_id" value={workoutId} />
-              <input type="hidden" name="current_shared" value={String(shared)} />
+              <input type="hidden" name="workout_title" value={workoutTitle} />
+              <input type="hidden" name="unshare" value={String(shared)} />
 
               {!shared && (
                 <textarea
-                  name="message"
+                  name="share_message"
                   placeholder="Add a message (optional)…"
                   rows={2}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
