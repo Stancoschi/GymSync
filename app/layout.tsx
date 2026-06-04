@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
+import Script from "next/script";
 import { ToastWrapper } from "@/components/ui/toast-wrapper";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -50,20 +51,6 @@ export const metadata: Metadata = {
   },
 };
 
-// Blocking theme script — runs synchronously before CSS is applied.
-// Inlined as a raw string so Next.js (Server Component) emits it as
-// a plain <script> tag in HTML, bypassing React client hydration entirely.
-const themeScript = `(function(){
-  try {
-    var stored = localStorage.getItem('gymsync-theme');
-    var preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    var theme = stored || preferred;
-    var html = document.documentElement;
-    html.classList.remove('dark', 'light');
-    html.classList.add(theme);
-  } catch(e) {}
-})();`;
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -76,8 +63,6 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -87,6 +72,24 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
       </head>
       <body className="min-h-full flex flex-col antialiased">
+        {/* Blocking theme script — runs before paint, sets .dark/.light on <html>.
+            strategy="beforeInteractive" emits the script in the SSR HTML stream
+            outside React's component tree, so React 19 never sees it. */}
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+  try {
+    var stored = localStorage.getItem('gymsync-theme');
+    var preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    var theme = stored || preferred;
+    document.documentElement.classList.remove('dark','light');
+    document.documentElement.classList.add(theme);
+  } catch(e) {}
+})();`,
+          }}
+        />
         {children}
         <Suspense fallback={null}>
           <ToastWrapper />
