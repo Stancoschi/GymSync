@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LiveSessionClient } from "@/components/workouts/live-session-client";
-import type { LastSessionMap } from "@/components/workouts/live-session-client";
+import type { LastSessionMap, LibraryExercise } from "@/components/workouts/live-session-client";
 
 export default async function LiveSessionPage({
   params,
@@ -15,7 +15,7 @@ export default async function LiveSessionPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  // 1. Load template + exercises — allow own templates AND public templates
+  // 1. Load template + exercises
   const { data: template } = await supabase
     .from("workout_templates")
     .select("id, name, user_id, is_public")
@@ -29,14 +29,20 @@ export default async function LiveSessionPage({
     .from("workout_template_exercises")
     .select(
       `id, order_index, target_sets, min_reps, max_reps, target_rir, notes, load_increment,
-       exercise_library ( id, name, muscle_group )`
+       exercise_library ( id, name, muscle_group, equipment )`
     )
     .eq("workout_template_id", id)
     .order("order_index");
 
   if (!exercises || exercises.length === 0) notFound();
 
-  // 2. PR baselines — best ever set per exercise for this user
+  // 2. Full exercise library for swap/superset
+  const { data: allExercises } = await supabase
+    .from("exercise_library")
+    .select("id, name, muscle_group, equipment")
+    .order("name");
+
+  // 3. PR baselines
   const exerciseIds = exercises
     .map((e) => {
       const lib = Array.isArray(e.exercise_library)
@@ -130,6 +136,7 @@ export default async function LiveSessionPage({
       templateId={template.id}
       templateName={template.name}
       exercises={exercises as Parameters<typeof LiveSessionClient>[0]["exercises"]}
+      allExercises={(allExercises ?? []) as LibraryExercise[]}
       prMap={prMap}
       lastSessionMap={lastSessionMap}
       userId={user.id}
