@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
-import Script from "next/script";
 import { ToastWrapper } from "@/components/ui/toast-wrapper";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -63,6 +62,15 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/*
+          Blocking theme script — must run before CSS to avoid FOUC.
+          Using an external src= file because React 19 blocks
+          dangerouslySetInnerHTML on <script> during hydration.
+          /theme-init.js is served from public/ with no defer/async
+          so it executes synchronously in the HTML stream.
+        */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script src="/theme-init.js" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -72,24 +80,6 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
       </head>
       <body className="min-h-full flex flex-col antialiased">
-        {/* Blocking theme script — runs before paint, sets .dark/.light on <html>.
-            strategy="beforeInteractive" emits the script in the SSR HTML stream
-            outside React's component tree, so React 19 never sees it. */}
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){
-  try {
-    var stored = localStorage.getItem('gymsync-theme');
-    var preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    var theme = stored || preferred;
-    document.documentElement.classList.remove('dark','light');
-    document.documentElement.classList.add(theme);
-  } catch(e) {}
-})();`,
-          }}
-        />
         {children}
         <Suspense fallback={null}>
           <ToastWrapper />
