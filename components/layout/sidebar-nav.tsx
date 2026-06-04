@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "⊞" },
   { href: "/workouts", label: "Workouts", icon: "◈" },
+  { href: "/one-rm", label: "1RM Calc", icon: "◑" },
   { href: "/nutrition", label: "Nutrition", icon: "◉" },
   { href: "/sessions", label: "Sessions", icon: "◎" },
   { href: "/feed", label: "Feed", icon: "◈" },
@@ -51,9 +52,9 @@ export function BottomNav() {
   const bottomItems = [
     navItems[0], // Dashboard
     navItems[1], // Workouts
-    navItems[3], // Sessions
-    navItems[4], // Feed
-    navItems[7], // Search
+    navItems[4], // Sessions
+    navItems[5], // Feed
+    navItems[8], // Search
   ];
 
   return (
