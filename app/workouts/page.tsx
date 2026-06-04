@@ -1,138 +1,112 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = { title: "Workouts" };
-
-const PAGE_SIZE = 12;
+import { ShareWorkoutButton } from "@/components/workouts/share-workout-button";
 
 export default async function WorkoutsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ message?: string }>;
 }) {
+  const query = await searchParams;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) redirect("/auth/login");
 
-  const params = await searchParams;
-  const page = Math.max(1, parseInt(params.page ?? "1", 10));
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-
-  // Fetch own templates
-  const { data: myTemplates, error, count } = await supabase
-    .from("workout_templates")
-    .select("id, name, description, created_at, user_id, is_public", { count: "exact" })
+  const { data: workouts } = await supabase
+    .from("workouts")
+    .select("id, title, workout_date, duration_minutes, is_shared_to_feed, share_message")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .range(from, to);
+    .order("workout_date", { ascending: false });
 
-  // Fetch public templates (Jeff Nippard etc.)
-  const { data: publicTemplates } = await supabase
+  const { data: templates } = await supabase
     .from("workout_templates")
-    .select("id, name, description, created_at, user_id, is_public")
-    .eq("is_public", true)
-    .is("user_id", null)
-    .order("name", { ascending: true });
-
-  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
-
-  if (error) {
-    return (
-      <main className="p-6">
-        <p className="text-sm text-red-600">{error.message}</p>
-      </main>
-    );
-  }
+    .select("id, name, description")
+    .or(`user_id.eq.${user.id},is_public.eq.true`)
+    .order("name");
 
   return (
-    <main className="p-6 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Training</p>
-          <h1 className="text-3xl font-semibold">Workout templates</h1>
-          <p className="text-sm text-muted-foreground">
-            Build reusable workouts with exercises, sets, reps and RIR targets.
-          </p>
+    <div className="space-y-6 pb-24 md:pb-6">
+      {query?.message && (
+        <div className="rounded-lg bg-muted px-4 py-3 text-sm">
+          {decodeURIComponent(query.message)}
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="rounded-md border px-4 py-2 text-sm">Back to dashboard</Link>
-          <Link href="/workouts/new" className="rounded-md bg-black px-4 py-2 text-sm text-white">New workout</Link>
-        </div>
-      </div>
-
-      {/* Public / Program templates */}
-      {publicTemplates && publicTemplates.length > 0 && (
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold">Programs</h2>
-            <p className="text-sm text-muted-foreground">Ready-made programs you can start immediately.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {publicTemplates.map((template: any) => (
-              <Link
-                key={template.id}
-                href={`/workouts/${template.id}`}
-                className="rounded-2xl border p-5 transition hover:bg-muted/40"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-lg font-semibold">{template.name}</h3>
-                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">public</span>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
-                  {template.description || "No description yet."}
-                </p>
-              </Link>
-            ))}
-          </div>
-        </section>
       )}
 
-      {/* My templates */}
-      <section className="space-y-4">
-        {(myTemplates?.length ?? 0) > 0 && (
-          <h2 className="text-lg font-semibold">My workouts</h2>
-        )}
-        {myTemplates && myTemplates.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {myTemplates.map((template: any) => (
-              <Link
-                key={template.id}
-                href={`/workouts/${template.id}`}
-                className="rounded-2xl border p-5 transition hover:bg-muted/40"
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Workouts</h1>
+        <Link
+          href="/workouts/new"
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          + New workout
+        </Link>
+      </div>
+
+      {/* Workout history */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">History</h2>
+        {workouts && workouts.length > 0 ? (
+          <div className="space-y-2">
+            {workouts.map((w) => (
+              <div
+                key={w.id}
+                className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 gap-3"
               >
-                <h2 className="text-xl font-semibold">{template.name}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {template.description || "No description yet."}
-                </p>
+                <Link href={`/workouts/${w.id}`} className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{w.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(w.workout_date).toLocaleDateString("ro-RO", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                    {w.duration_minutes ? ` · ${w.duration_minutes} min` : ""}
+                  </p>
+                </Link>
+                <ShareWorkoutButton
+                  workoutId={w.id}
+                  isShared={w.is_shared_to_feed ?? false}
+                  workoutTitle={w.title}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No workouts logged yet.</p>
+        )}
+      </section>
+
+      {/* Templates */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Templates</h2>
+        {templates && templates.length > 0 ? (
+          <div className="space-y-2">
+            {templates.map((t) => (
+              <Link
+                key={t.id}
+                href={`/workouts/${t.id}`}
+                className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 hover:bg-muted/30 transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{t.name}</p>
+                  {t.description && (
+                    <p className="text-xs text-muted-foreground truncate">{t.description}</p>
+                  )}
+                </div>
+                <span className="text-muted-foreground text-sm ml-3 shrink-0">→</span>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border p-6 text-sm text-muted-foreground">
-            No workout templates yet. Create your first Push, Pull or Legs session.
-          </div>
+          <p className="text-sm text-muted-foreground">No templates yet.</p>
         )}
       </section>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
-          {page > 1 && (
-            <Link href={`/workouts?page=${page - 1}`} className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors">
-              ← Previous
-            </Link>
-          )}
-          <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-          {page < totalPages && (
-            <Link href={`/workouts?page=${page + 1}`} className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors">
-              Next →
-            </Link>
-          )}
-        </div>
-      )}
-    </main>
+    </div>
   );
 }
