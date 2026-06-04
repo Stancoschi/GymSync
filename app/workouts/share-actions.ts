@@ -1,53 +1,73 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
-/**
- * Toggles is_shared_to_feed on a workout the current user owns.
- * Optionally stores a share_message.
- */
 export async function shareWorkoutToFeed(formData: FormData) {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  if (!user) redirect("/auth/login");
+  if (!user) return { error: "Not authenticated" };
 
   const workoutId = formData.get("workout_id") as string;
-  const message = ((formData.get("message") as string) ?? "").trim() || null;
-  const currentShared = formData.get("current_shared") === "true";
+  const workoutTitle = formData.get("workout_title") as string;
+  const message = (formData.get("share_message") as string | null) ?? null;
+  const unshare = formData.get("unshare") === "true";
 
-  // Verify ownership before updating
-  const { data: workout, error: fetchError } = await supabase
+  // Verify ownership
+  const { data: workout } = await supabase
     .from("workouts")
     .select("id, user_id")
     .eq("id", workoutId)
     .eq("user_id", user.id)
     .single();
 
-  if (fetchError || !workout) {
-    redirect(`/workouts?message=${encodeURIComponent("Workout not found or access denied")}`);
-  }
+  if (!workout) return { error: "Workout not found or access denied" };
 
-  const newShared = !currentShared;
+  if (unshare) {
+    // Remove from feed
+    await supabase
+      .from("workouts")
+      .update({ is_shared_to_feed: false, share_message: null })
+      .eq("id", workoutId)
+      .eq("user_id", user.id);
 
-  const { error } = await supabase
-    .from("workouts")
-    .update({
-      is_shared_to_feed: newShared,
-      share_message: newShared ? message : null,
-    })
-    .eq("id", workoutId)
-    .eq("user_id", user.id);
+    await supabase.from("feed_items").delete().eq("id", workoutId);
+  } else {
+    // Get profile for actor_name
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, username")
+      .eq("id", user.id)
+      .single();
 
-  if (error) {
-    redirect(`/workouts?message=${encodeURIComponent(error.message)}`);
+    await supabase
+      .from("workouts")
+      .update({
+        is_shared_to_feed: true,
+        share_message: message?.trim() || null,
+      })
+      .eq("id", workoutId)
+      .eq("user_id", user.id);
+
+    // Upsert into feed_items (use workout id as feed item id for easy dedup)
+    await supabase.from("feed_items").upsert(
+      {
+        id: workoutId,
+        type: "workout",
+        actor_id: user.id,
+        actor_name: profile?.full_name ?? "Unknown",
+        actor_username: profile?.username ?? null,
+        title: workoutTitle,
+        subtitle: "",
+        share_message: message?.trim() || null,
+      },
+      { onConflict: "id" }
+    );
   }
 
   revalidatePath("/feed");
   revalidatePath("/workouts");
+  return { success: true };
 }
