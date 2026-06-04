@@ -7,7 +7,9 @@ import { WeightChart } from "@/components/dashboard/weight-chart";
 import { WorkoutVolumeChart } from "@/components/dashboard/workout-volume-chart";
 import { WorkoutHeatmap } from "@/components/dashboard/workout-heatmap";
 import { MuscleHeatmap } from "@/components/dashboard/muscle-heatmap";
+import { ReadinessScore } from "@/components/dashboard/readiness-score";
 import { loadMuscleHeatmapData } from "@/lib/muscle-heatmap-data";
+import { calculateReadiness } from "@/lib/fatigue";
 
 function startOfLast7Days() {
   const date = new Date();
@@ -175,6 +177,13 @@ export default async function DashboardPage() {
 
   const workoutWeekStreak = calculateWorkoutWeekStreak(allWorkoutsForStreak);
 
+  // ─── Fatigue & Readiness Score ──────────────────────────────────────────────
+  const readinessResult = calculateReadiness({
+    workoutDates: (allWorkoutsForStreak).map((w) => w.workout_date),
+    targetPerWeek: profile?.training_days_per_week,
+  });
+  const workoutsThisWeek = recentWorkoutsCount;
+
   // ─── PR Highlights: 3 separate queries ────────────────────────────────────
   const prHighlights: PrHighlight[] = await (async () => {
     const { data: userSessions } = await supabase
@@ -286,6 +295,15 @@ export default async function DashboardPage() {
             <p className="text-xs text-muted-foreground">{stat.sub}</p>
           </div>
         ))}
+      </section>
+
+      {/* Readiness Score */}
+      <section>
+        <ReadinessScore
+          result={readinessResult}
+          workoutsThisWeek={workoutsThisWeek}
+          targetPerWeek={profile?.training_days_per_week}
+        />
       </section>
 
       {/* Challenge banner */}
