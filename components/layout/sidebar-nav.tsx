@@ -8,14 +8,15 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard",  label: "Dashboard",  Icon: LayoutDashboard },
-  { href: "/workouts",   label: "Workouts",   Icon: Dumbbell },
-  { href: "/nutrition",  label: "Nutrition",  Icon: Salad },
-  { href: "/sessions",   label: "Sessions",   Icon: CalendarDays },
-  { href: "/feed",       label: "Feed",       Icon: Rss },
-  { href: "/friends",    label: "Friends",    Icon: Users },
-  { href: "/challenges", label: "Challenges", Icon: Trophy },
-  { href: "/search",     label: "Search",     Icon: Search },
+  { href: "/dashboard", label: "Dashboard", icon: "⊞" },
+  { href: "/workouts", label: "Workouts", icon: "◈" },
+  { href: "/one-rm", label: "1RM Calc", icon: "◑" },
+  { href: "/nutrition", label: "Nutrition", icon: "◉" },
+  { href: "/sessions", label: "Sessions", icon: "◎" },
+  { href: "/feed", label: "Feed", icon: "◈" },
+  { href: "/friends", label: "Friends", icon: "◌" },
+  { href: "/challenges", label: "Challenges", icon: "◆" },
+  { href: "/search", label: "Search", icon: "○" },
 ];
 
 export function SidebarNav() {
