@@ -1,9 +1,3 @@
-(function(){
-  try{
-    var s=localStorage.getItem('gymsync-theme');
-    var p=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
-    var t=s||p;
-    document.documentElement.classList.remove('dark','light');
-    document.documentElement.classList.add(t);
-  }catch(e){}
-})();
+// Deprecated: theme is now handled server-side via cookie.
+// This file is kept only to avoid 404s from any cached HTML.
+// Safe to delete after one deploy cycle.

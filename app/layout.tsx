@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { ToastWrapper } from "@/components/ui/toast-wrapper";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -50,27 +51,23 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read theme from cookie server-side — no client script needed, no FOUC.
+  // Falls back to 'dark' (app default) if no cookie is set yet.
+  const cookieStore = await cookies();
+  const theme = cookieStore.get('gymsync-theme')?.value === 'light' ? 'light' : 'dark';
+
   return (
     <html
       lang="en"
-      className={`${plusJakarta.variable} ${geistMono.variable} dark h-full`}
+      className={`${plusJakarta.variable} ${geistMono.variable} ${theme} h-full`}
       suppressHydrationWarning
     >
       <head>
-        {/*
-          Blocking theme script — must run before CSS to avoid FOUC.
-          Using an external src= file because React 19 blocks
-          dangerouslySetInnerHTML on <script> during hydration.
-          /theme-init.js is served from public/ with no defer/async
-          so it executes synchronously in the HTML stream.
-        */}
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script src="/theme-init.js" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
