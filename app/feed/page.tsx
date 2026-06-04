@@ -42,6 +42,13 @@ type ExerciseSummary = {
   best_weight_kg: number | null;
 };
 
+type SessionRow = {
+  id: string;
+  user_id: string;
+  completed_at: string | null;
+  duration_seconds: number | null;
+};
+
 export default async function FeedPage({
   searchParams,
 }: {
@@ -132,7 +139,7 @@ export default async function FeedPage({
         .map((i: any) => [i.id as string, i.actor_id as string])
     );
 
-    const { data: sessionsWithUser } = await supabase
+    const { data: sessionsRaw } = await supabase
       .from("workout_sessions")
       .select("id, user_id, completed_at, duration_seconds")
       .in("user_id", actorIds)
@@ -140,7 +147,9 @@ export default async function FeedPage({
       .order("completed_at", { ascending: false })
       .limit(workoutItemIds.length * 2 + 10);
 
-    const sessionIds = (sessionsWithUser ?? []).map((s) => s.id);
+    const sessionsWithUser: SessionRow[] = sessionsRaw ?? [];
+
+    const sessionIds = sessionsWithUser.map((s) => s.id);
     const sessionExerciseMap = new Map<string, Map<string, ExerciseSummary>>();
 
     if (sessionIds.length > 0) {
@@ -206,11 +215,11 @@ export default async function FeedPage({
       const workoutDate = workoutDateMap.get(feedItemId);
       if (!actorId || !workoutDate) continue;
 
-      let bestSession: (typeof sessionsWithUser)[0] | null = null;
+      let bestSession: SessionRow | null = null;
       let bestDiff = Infinity;
       const workoutTime = new Date(workoutDate).getTime();
 
-      for (const s of sessionsWithUser ?? []) {
+      for (const s of sessionsWithUser) {
         if (s.user_id !== actorId || !s.completed_at) continue;
         const diff = Math.abs(new Date(s.completed_at).getTime() - workoutTime);
         if (diff < bestDiff) { bestDiff = diff; bestSession = s; }
