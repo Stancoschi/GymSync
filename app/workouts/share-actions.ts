@@ -15,17 +15,12 @@ export async function shareWorkoutToFeed(formData: FormData) {
   const message = (formData.get("share_message") as string | null) ?? null;
   const unshare = formData.get("unshare") === "true";
 
-  console.log("[share] workoutId:", workoutId, "| title:", workoutTitle, "| unshare:", unshare);
-
-  // Verify ownership
-  const { data: workout, error: ownerErr } = await supabase
+  const { data: workout } = await supabase
     .from("workouts")
     .select("id, user_id")
     .eq("id", workoutId)
     .eq("user_id", user.id)
     .single();
-
-  console.log("[share] ownership check:", workout, "| error:", ownerErr?.message);
 
   if (!workout) return { error: "Workout not found or access denied" };
 
@@ -36,19 +31,13 @@ export async function shareWorkoutToFeed(formData: FormData) {
       .eq("id", workoutId)
       .eq("user_id", user.id);
 
-    const { error: delErr } = await supabase
-      .from("feed_items")
-      .delete()
-      .eq("id", workoutId);
-    console.log("[share] delete from feed_items error:", delErr?.message ?? "none");
+    await supabase.from("feed_items").delete().eq("id", workoutId);
   } else {
     const { data: profile } = await supabase
       .from("profiles")
       .select("full_name, username")
       .eq("id", user.id)
       .single();
-
-    console.log("[share] profile:", profile);
 
     await supabase
       .from("workouts")
@@ -59,33 +48,19 @@ export async function shareWorkoutToFeed(formData: FormData) {
       .eq("id", workoutId)
       .eq("user_id", user.id);
 
-    const { data: upserted, error: upsertErr } = await supabase
-      .from("feed_items")
-      .upsert(
-        {
-          id: workoutId,
-          type: "workout",
-          actor_id: user.id,
-          actor_name: profile?.full_name ?? "Unknown",
-          actor_username: profile?.username ?? null,
-          title: workoutTitle,
-          subtitle: "",
-          share_message: message?.trim() || null,
-        },
-        { onConflict: "id" }
-      )
-      .select();
-
-    console.log("[share] upsert result:", JSON.stringify(upserted));
-    console.log("[share] upsert error:", upsertErr?.message ?? "none", "| code:", upsertErr?.code ?? "none");
-
-    // Verify it landed
-    const { data: check } = await supabase
-      .from("feed_items")
-      .select("id, actor_id, title")
-      .eq("id", workoutId)
-      .single();
-    console.log("[share] feed_items verify:", JSON.stringify(check));
+    await supabase.from("feed_items").upsert(
+      {
+        id: workoutId,
+        type: "workout",
+        actor_id: user.id,
+        actor_name: profile?.full_name ?? "Unknown",
+        actor_username: profile?.username ?? null,
+        title: workoutTitle,
+        subtitle: "",
+        share_message: message?.trim() || null,
+      },
+      { onConflict: "id" }
+    );
   }
 
   revalidatePath("/feed");

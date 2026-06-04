@@ -58,7 +58,6 @@ export default async function FeedPage({
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  // ── Friends (+ self) ───────────────────────────────────────────────────────
   const { data: friendships } = await supabase
     .from("friendships")
     .select("user_a_id, user_b_id")
@@ -72,11 +71,7 @@ export default async function FeedPage({
     }
   }
 
-  console.log("[feed] user:", user.id);
-  console.log("[feed] friendIds:", friendIds);
-
-  // ── Feed items ─────────────────────────────────────────────────────────────
-  const { data: rawItems, error: feedError } = await supabase
+  const { data: rawItems } = await supabase
     .from("feed_items")
     .select(
       "id, type, created_at, actor_id, actor_name, actor_username, title, subtitle, share_message, reaction_count, comments:feed_comments(id, content, created_at, author_name, author_username)"
@@ -85,11 +80,6 @@ export default async function FeedPage({
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  console.log("[feed] feedError:", feedError?.message ?? "none", "| code:", feedError?.code ?? "none");
-  console.log("[feed] rawItems count:", rawItems?.length ?? 0);
-  console.log("[feed] rawItems:", JSON.stringify(rawItems?.map((i: any) => ({ id: i.id, type: i.type, title: i.title, actor_id: i.actor_id }))));
-
-  // ── reacted_by_me — computed from feed_reactions ───────────────────────────
   const itemIds = (rawItems ?? []).map((i: any) => i.id as string);
   const reactedSet = new Set<string>();
   if (itemIds.length > 0) {
@@ -101,7 +91,6 @@ export default async function FeedPage({
     for (const r of myReactions ?? []) reactedSet.add(r.feed_item_id);
   }
 
-  // ── PR flags ───────────────────────────────────────────────────────────────
   const workoutItemIds = (rawItems ?? [])
     .filter((i: any) => i.type === "workout")
     .map((i: any) => i.id as string);
@@ -116,7 +105,6 @@ export default async function FeedPage({
     for (const row of prRows ?? []) prWorkoutIds.add(row.id);
   }
 
-  // ── Rich workout preview ───────────────────────────────────────────────────
   const workoutPreviewMap = new Map<string, ExerciseSummary[]>();
   const workoutDurationMap = new Map<string, number | null>();
 
@@ -240,7 +228,6 @@ export default async function FeedPage({
     }
   }
 
-  // ── Assemble ───────────────────────────────────────────────────────────────
   const feedItems: FeedItem[] = (rawItems ?? []).map((item: any) => ({
     ...item,
     reacted_by_me: reactedSet.has(item.id),
