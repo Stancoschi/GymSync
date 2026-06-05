@@ -4,6 +4,8 @@ import "./globals.css";
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { ToastWrapper } from "@/components/ui/toast-wrapper";
+import { LanguageProvider } from "@/lib/i18n/language-context";
+import type { Lang } from "@/lib/i18n/translations";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -56,14 +58,14 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Read theme from cookie server-side — no client script needed, no FOUC.
-  // Falls back to 'dark' (app default) if no cookie is set yet.
   const cookieStore = await cookies();
-  const theme = cookieStore.get('gymsync-theme')?.value === 'light' ? 'light' : 'dark';
+  const theme = cookieStore.get("gymsync-theme")?.value === "light" ? "light" : "dark";
+  const langCookie = cookieStore.get("gymsync-lang")?.value;
+  const initialLang: Lang = langCookie === "ro" ? "ro" : "en";
 
   return (
     <html
-      lang="en"
+      lang={initialLang}
       className={`${plusJakarta.variable} ${geistMono.variable} ${theme} h-full`}
       suppressHydrationWarning
     >
@@ -77,10 +79,12 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
       </head>
       <body className="min-h-full flex flex-col antialiased">
-        {children}
-        <Suspense fallback={null}>
-          <ToastWrapper />
-        </Suspense>
+        <LanguageProvider initialLang={initialLang}>
+          {children}
+          <Suspense fallback={null}>
+            <ToastWrapper />
+          </Suspense>
+        </LanguageProvider>
       </body>
     </html>
   );

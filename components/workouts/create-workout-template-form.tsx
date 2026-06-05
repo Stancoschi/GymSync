@@ -1,13 +1,17 @@
 "use client";
 
 import { createWorkoutTemplate } from "@/app/workouts/actions";
+import { useLanguage } from "@/lib/i18n/language-context";
 
 export function CreateWorkoutTemplateForm() {
+  const { t } = useLanguage();
+  const w = t.workouts;
+
   return (
     <form action={createWorkoutTemplate} className="max-w-2xl space-y-6 rounded-2xl border p-6">
       <div className="space-y-2">
         <label htmlFor="name" className="text-sm font-medium">
-          Workout name
+          {w.workoutName}
         </label>
         <input
           id="name"
@@ -21,7 +25,7 @@ export function CreateWorkoutTemplateForm() {
 
       <div className="space-y-2">
         <label htmlFor="description" className="text-sm font-medium">
-          Description
+          {w.description}
         </label>
         <textarea
           id="description"
@@ -36,7 +40,7 @@ export function CreateWorkoutTemplateForm() {
         type="submit"
         className="rounded-xl bg-black px-6 py-3 text-white"
       >
-        Create workout
+        {w.createTemplate}
       </button>
     </form>
   );

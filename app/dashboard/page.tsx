@@ -8,22 +8,32 @@ import { WorkoutVolumeChart } from "@/components/dashboard/workout-volume-chart"
 import { WorkoutHeatmap } from "@/components/dashboard/workout-heatmap";
 import { MuscleHeatmap } from "@/components/dashboard/muscle-heatmap";
 import { ReadinessScore } from "@/components/dashboard/readiness-score";
+import {
+  DashboardGreeting,
+  DashboardChallengeBanner,
+  GoalProgressCard,
+  AdherenceCard,
+  CoachCard,
+  PrCard,
+  RecentWorkoutsCard,
+  BodyLogsCard,
+  UpcomingSessionsCard,
+} from "@/components/dashboard/dashboard-texts";
 import { loadMuscleHeatmapData } from "@/lib/muscle-heatmap-data";
 import { calculateReadiness } from "@/lib/fatigue";
 import {
   Scale, Flame, Dumbbell, Utensils,
   BarChart2, CalendarDays, Users, Target,
-  Trophy, ArrowRight, TrendingUp
 } from "lucide-react";
 
-function startOfLast7Days() {
-  const date = new Date();
-  date.setDate(date.getDate() - 7);
-  return date.toISOString().split("T")[0];
-}
 function startOfLastNWeeks(n: number) {
   const date = new Date();
   date.setDate(date.getDate() - n * 7);
+  return date.toISOString().split("T")[0];
+}
+function startOfLast7Days() {
+  const date = new Date();
+  date.setDate(date.getDate() - 7);
   return date.toISOString().split("T")[0];
 }
 function getGoalLabel(goal: string | null | undefined) {
@@ -81,54 +91,31 @@ function calculateWorkoutWeekStreak(workouts: Array<{ workout_date: string }>) {
   return streak;
 }
 function calculateEstimated1RM(weight: number, reps: number) { return weight * (1 + reps / 30); }
-
 function buildWeightChartData(logs: Array<{ log_date: string; weight_kg: number | null }>) {
-  return logs
-    .filter((l) => l.weight_kg !== null)
-    .map((l) => ({
-      date: new Date(l.log_date).toLocaleDateString("ro-RO", { day: "numeric", month: "short" }),
-      weight: Number(l.weight_kg),
-    }))
-    .reverse();
+  return logs.filter((l) => l.weight_kg !== null).map((l) => ({
+    date: new Date(l.log_date).toLocaleDateString("ro-RO", { day: "numeric", month: "short" }),
+    weight: Number(l.weight_kg),
+  })).reverse();
 }
-
 function buildVolumeChartData(workouts: Array<{ workout_date: string }>) {
   const weekMap = new Map<string, { label: string; count: number }>();
   for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i * 7);
+    const d = new Date(); d.setDate(d.getDate() - i * 7);
     const key = getWeekKey(d.toISOString());
     const label = getWeekLabel(d.toISOString());
     if (!weekMap.has(key)) weekMap.set(key, { label, count: 0 });
   }
-  for (const w of workouts) {
-    const key = getWeekKey(w.workout_date);
-    const entry = weekMap.get(key);
-    if (entry) entry.count++;
-  }
+  for (const w of workouts) { const key = getWeekKey(w.workout_date); const entry = weekMap.get(key); if (entry) entry.count++; }
   return Array.from(weekMap.values()).map(({ label, count }) => ({ week: label, count }));
 }
-
-function buildHeatmapData(
-  workouts: Array<{ workout_date: string }>,
-  weeks: number
-): Array<{ date: string; count: number }> {
+function buildHeatmapData(workouts: Array<{ workout_date: string }>, weeks: number): Array<{ date: string; count: number }> {
   void weeks;
   const dayMap = new Map<string, number>();
-  for (const w of workouts) {
-    const ymd = w.workout_date.split("T")[0];
-    dayMap.set(ymd, (dayMap.get(ymd) ?? 0) + 1);
-  }
+  for (const w of workouts) { const ymd = w.workout_date.split("T")[0]; dayMap.set(ymd, (dayMap.get(ymd) ?? 0) + 1); }
   return Array.from(dayMap.entries()).map(([date, count]) => ({ date, count }));
 }
 
-type StatCard = {
-  label: string;
-  value: string;
-  sub: string;
-  accent?: boolean;
-  Icon: React.ElementType;
-};
+type StatCard = { label: string; value: string; sub: string; accent?: boolean; Icon: React.ElementType; };
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -187,7 +174,6 @@ export default async function DashboardPage() {
     : { data: null };
 
   const workoutWeekStreak = calculateWorkoutWeekStreak(allWorkoutsForStreak);
-
   const readinessResult = calculateReadiness({
     workoutDates: allWorkoutsForStreak.map((w) => w.workout_date),
     targetPerWeek: profile?.training_days_per_week,
@@ -195,30 +181,21 @@ export default async function DashboardPage() {
   const workoutsThisWeek = recentWorkoutsCount;
 
   const prHighlights: PrHighlight[] = await (async () => {
-    const { data: userSessions } = await supabase
-      .from("workout_sessions").select("id, completed_at")
-      .eq("user_id", user.id).eq("status", "completed");
+    const { data: userSessions } = await supabase.from("workout_sessions").select("id, completed_at").eq("user_id", user.id).eq("status", "completed");
     if (!userSessions || userSessions.length === 0) return [];
     const sessionIds = userSessions.map((s) => s.id);
     const sessionDateMap = new Map<string, string>(userSessions.map((s) => [s.id, s.completed_at as string]));
-    const { data: wseRows } = await supabase
-      .from("workout_session_exercises").select("id, workout_session_id, exercise_id, exercise_library ( name )")
-      .in("workout_session_id", sessionIds);
+    const { data: wseRows } = await supabase.from("workout_session_exercises").select("id, workout_session_id, exercise_id, exercise_library ( name )").in("workout_session_id", sessionIds);
     if (!wseRows || wseRows.length === 0) return [];
     const wseIds = wseRows.map((w) => w.id);
     const wseMetaMap = new Map<string, { exerciseName: string; completedAt: string }>();
     for (const wse of wseRows) {
-      const exerciseName = Array.isArray(wse.exercise_library)
-        ? (wse.exercise_library[0] as { name: string } | undefined)?.name
-        : (wse.exercise_library as { name: string } | null)?.name;
+      const exerciseName = Array.isArray(wse.exercise_library) ? (wse.exercise_library[0] as { name: string } | undefined)?.name : (wse.exercise_library as { name: string } | null)?.name;
       const completedAt = sessionDateMap.get(wse.workout_session_id as string);
       if (exerciseName && completedAt) wseMetaMap.set(wse.id, { exerciseName, completedAt });
     }
     if (wseMetaMap.size === 0) return [];
-    const { data: setLogs } = await supabase
-      .from("workout_set_logs").select("reps, weight_kg, workout_session_exercise_id")
-      .in("workout_session_exercise_id", wseIds)
-      .eq("completed", true).not("weight_kg", "is", null).not("reps", "is", null).limit(500);
+    const { data: setLogs } = await supabase.from("workout_set_logs").select("reps, weight_kg, workout_session_exercise_id").in("workout_session_exercise_id", wseIds).eq("completed", true).not("weight_kg", "is", null).not("reps", "is", null).limit(500);
     if (!setLogs || setLogs.length === 0) return [];
     const prMap = new Map<string, PrHighlight>();
     for (const set of setLogs) {
@@ -242,51 +219,38 @@ export default async function DashboardPage() {
   const coachMessage = getCoachMessage({ goal: profile?.goal ?? null, experienceLevel: profile?.experience_level ?? null, recentWorkoutsCount, targetPerWeek: profile?.training_days_per_week });
 
   const statCards: StatCard[] = [
-    { label: "Latest weight",    value: latestWeight?.weight_kg ? `${latestWeight.weight_kg} kg` : "—", sub: latestWeight?.log_date ?? "No logs yet", Icon: Scale },
-    { label: "Week streak",      value: `${workoutWeekStreak} wk`, sub: "Consecutive active weeks", accent: workoutWeekStreak > 0, Icon: Flame },
-    { label: "Last 7 days",      value: `${recentWorkoutsCount} workouts`, sub: "Consistency snapshot", accent: recentWorkoutsCount > 0, Icon: Dumbbell },
-    { label: "Meals logged",     value: `${mealsCount}`, sub: "Nutrition entries", Icon: Utensils },
-    { label: "Total workouts",   value: `${workoutsCount}`, sub: "All time", Icon: BarChart2 },
-    { label: "Sessions created", value: `${sessionsCreatedCount}`, sub: "Gym meetups posted", Icon: CalendarDays },
-    { label: "Sessions joined",  value: `${sessionsJoinedCount}`, sub: "Social participation", Icon: Users },
-    { label: "Goal",             value: getGoalLabel(profile?.goal), sub: profile?.experience_level ?? "Set in profile", Icon: Target },
+    { label: "Latest weight",    value: latestWeight?.weight_kg ? `${latestWeight.weight_kg} kg` : "—", sub: latestWeight?.log_date ?? "No logs yet",         Icon: Scale },
+    { label: "Week streak",      value: `${workoutWeekStreak} wk`,                                        sub: "Consecutive active weeks", accent: workoutWeekStreak > 0, Icon: Flame },
+    { label: "Last 7 days",      value: `${recentWorkoutsCount} workouts`,                                sub: "Consistency snapshot",     accent: recentWorkoutsCount > 0, Icon: Dumbbell },
+    { label: "Meals logged",     value: `${mealsCount}`,                                                  sub: "Nutrition entries",                               Icon: Utensils },
+    { label: "Total workouts",   value: `${workoutsCount}`,                                               sub: "All time",                                         Icon: BarChart2 },
+    { label: "Sessions created", value: `${sessionsCreatedCount}`,                                        sub: "Gym meetups posted",                              Icon: CalendarDays },
+    { label: "Sessions joined",  value: `${sessionsJoinedCount}`,                                         sub: "Social participation",                            Icon: Users },
+    { label: "Goal",             value: getGoalLabel(profile?.goal),                                      sub: profile?.experience_level ?? "Set in profile",    Icon: Target },
   ];
 
   return (
     <div className="space-y-6 pb-24 md:pb-6">
 
-      {/* Header */}
-      <div className="animate-fade-up">
-        <h1 className="text-2xl font-extrabold tracking-tight">
-          Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""} 👋
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
-        </p>
-      </div>
+      {/* Header — client component pentru greeting localizat */}
+      <DashboardGreeting name={profile?.full_name ?? undefined} />
 
-      {/* KPI cards */}
+      {/* KPI cards — labels statice, valorile sunt numere = nu necesită traducere */}
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4 stagger-children">
         {statCards.map(({ label, value, sub, accent, Icon }) => (
           <div
             key={label}
             className={`animate-fade-up rounded-2xl border p-4 space-y-2 card-interactive ${
-              accent
-                ? "border-primary/25 bg-primary/5"
-                : "border-border bg-card"
+              accent ? "border-primary/25 bg-primary/5" : "border-border bg-card"
             }`}
           >
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                accent ? "bg-primary/15" : "bg-muted"
-              }`}>
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${accent ? "bg-primary/15" : "bg-muted"}`}>
                 <Icon size={14} strokeWidth={2} className={accent ? "text-primary" : "text-muted-foreground"} />
               </div>
             </div>
-            <p className={`text-2xl font-extrabold tabular leading-none ${
-              accent ? "text-primary" : "text-foreground"
-            }`}>{value}</p>
+            <p className={`text-2xl font-extrabold tabular leading-none ${accent ? "text-primary" : "text-foreground"}`}>{value}</p>
             <p className="text-xs text-muted-foreground">{sub}</p>
           </div>
         ))}
@@ -294,72 +258,31 @@ export default async function DashboardPage() {
 
       {/* Readiness */}
       <section className="animate-fade-up">
-        <ReadinessScore
-          result={readinessResult}
-          workoutsThisWeek={workoutsThisWeek}
-          targetPerWeek={profile?.training_days_per_week}
-        />
+        <ReadinessScore result={readinessResult} workoutsThisWeek={workoutsThisWeek} targetPerWeek={profile?.training_days_per_week} />
       </section>
 
       {/* Challenge banner */}
-      <Link
-        href="/challenges"
-        className="animate-fade-up group flex items-center justify-between rounded-2xl border border-primary/25 bg-primary/5 px-5 py-4 hover:bg-primary/10 transition-all duration-200"
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-            <Trophy size={18} className="text-primary" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">Weekly challenge</p>
-            <p className="font-bold text-foreground">Complete 3 workouts this week</p>
-            <p className="text-xs text-muted-foreground mt-0.5">View progress &amp; compare with friends</p>
-          </div>
-        </div>
-        <ArrowRight size={18} className="text-primary shrink-0 group-hover:translate-x-1 transition-transform duration-200" />
-      </Link>
+      <DashboardChallengeBanner />
 
       {/* Progress cards */}
       <section className="grid gap-4 md:grid-cols-3 stagger-children">
-        <div className="animate-fade-up rounded-2xl border border-border bg-card p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Goal progress</h2>
-            <span className="text-xs rounded-lg bg-muted px-2.5 py-1 text-muted-foreground font-medium">{getGoalLabel(profile?.goal)}</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {currentWeightValue && targetWeightValue ? `${currentWeightValue} kg → ${targetWeightValue} kg` : "Add weight & target to track progress"}
-          </p>
-          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-            <div className="h-full rounded-full bg-primary transition-all duration-700" style={{ width: `${goalProgressPercent ?? 0}%` }} />
-          </div>
-          <p className="text-xs font-semibold text-primary">{goalProgressPercent !== null ? `${goalProgressPercent}% toward goal` : "Not available yet"}</p>
-        </div>
-
-        <div className="animate-fade-up rounded-2xl border border-border bg-card p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Weekly adherence</h2>
-            <span className="text-xs rounded-lg bg-muted px-2.5 py-1 text-muted-foreground font-medium">{profile?.training_days_per_week ?? "—"} days</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {profile?.training_days_per_week ? `${recentWorkoutsCount} of ${profile.training_days_per_week} sessions done` : "Set weekly target in onboarding"}
-          </p>
-          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-            <div className="h-full rounded-full bg-primary transition-all duration-700" style={{ width: `${adherencePercent ?? 0}%` }} />
-          </div>
-          <p className="text-xs font-semibold text-primary">{adherencePercent !== null ? `${adherencePercent}% adherence` : "Not available yet"}</p>
-        </div>
-
-        <div className="animate-fade-up rounded-2xl border border-border bg-card p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Coach note</h2>
-            <span className="text-xs rounded-lg bg-muted px-2.5 py-1 text-muted-foreground font-medium capitalize">{profile?.experience_level ?? "general"}</span>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">{coachMessage}</p>
-          <div className="rounded-xl bg-muted/50 px-3 py-2.5">
-            <p className="text-xs font-semibold">{preferredGym?.name ?? "No preferred gym"}</p>
-            <p className="text-xs text-muted-foreground">{preferredGym?.city ?? "Set one in profile settings"}</p>
-          </div>
-        </div>
+        <GoalProgressCard
+          goalLabel={getGoalLabel(profile?.goal)}
+          currentWeight={currentWeightValue}
+          targetWeight={targetWeightValue}
+          goalProgressPercent={goalProgressPercent}
+        />
+        <AdherenceCard
+          recentCount={recentWorkoutsCount}
+          targetPerWeek={profile?.training_days_per_week}
+          adherencePercent={adherencePercent}
+        />
+        <CoachCard
+          message={coachMessage}
+          gymName={preferredGym?.name ?? undefined}
+          gymCity={preferredGym?.city ?? undefined}
+          experienceLevel={profile?.experience_level ?? undefined}
+        />
       </section>
 
       {/* Muscle heatmap */}
@@ -405,120 +328,10 @@ export default async function DashboardPage() {
 
       {/* Lists */}
       <section className="grid gap-4 xl:grid-cols-2 stagger-children">
-
-        {/* PRs */}
-        <div className="animate-fade-up rounded-2xl border border-border bg-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <TrendingUp size={15} className="text-primary" /> PR highlights
-            </h2>
-            <Link href="/workouts" className="text-xs text-primary hover:underline font-medium">View all →</Link>
-          </div>
-          {prHighlights.length > 0 ? (
-            <div className="space-y-2">
-              {prHighlights.map((pr: PrHighlight) => (
-                <div key={pr.exerciseName} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5 hover:bg-muted/60 transition-colors">
-                  <div>
-                    <p className="text-sm font-semibold">{pr.exerciseName}</p>
-                    <p className="text-xs text-muted-foreground">{pr.weight} kg × {pr.reps} reps</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-primary tabular">{pr.estimated1RM.toFixed(1)} kg</p>
-                    <p className="text-xs text-muted-foreground">est. 1RM</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-6 text-center">Log weighted sets to see your PRs.</p>
-          )}
-        </div>
-
-        {/* Recent workouts */}
-        <div className="animate-fade-up rounded-2xl border border-border bg-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <Dumbbell size={15} className="text-primary" /> Recent workouts
-            </h2>
-            <Link href="/workouts" className="text-xs text-primary hover:underline font-medium">View all →</Link>
-          </div>
-          {recentWorkouts.length > 0 ? (
-            <div className="space-y-2">
-              {recentWorkouts.map((workout: WorkoutRow) => (
-                <div key={workout.id} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5 hover:bg-muted/60 transition-colors">
-                  <div>
-                    <p className="text-sm font-semibold">{workout.title}</p>
-                    <p className="text-xs text-muted-foreground">{workout.workout_date}</p>
-                  </div>
-                  {workout.duration_minutes && (
-                    <span className="text-xs text-muted-foreground bg-muted rounded-lg px-2 py-1 font-medium">{workout.duration_minutes} min</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-6 text-center">No workouts yet. Start logging!</p>
-          )}
-        </div>
-
-        {/* Body logs */}
-        <div className="animate-fade-up rounded-2xl border border-border bg-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <Scale size={15} className="text-primary" /> Body logs
-            </h2>
-            <Link href="/nutrition" className="text-xs text-primary hover:underline font-medium">View all →</Link>
-          </div>
-          {recentBodyLogs.length > 0 ? (
-            <div className="space-y-2">
-              {recentBodyLogs.map((log: BodyLogRow) => (
-                <div key={log.id} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5 hover:bg-muted/60 transition-colors">
-                  <div>
-                    <p className="text-sm font-semibold">{log.weight_kg} kg</p>
-                    <p className="text-xs text-muted-foreground">{log.log_date}</p>
-                  </div>
-                  {log.body_fat_percent && (
-                    <span className="text-xs text-muted-foreground bg-muted rounded-lg px-2 py-1 font-medium">{log.body_fat_percent}% BF</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-6 text-center">No body logs yet.</p>
-          )}
-        </div>
-
-        {/* Upcoming sessions */}
-        <div className="animate-fade-up rounded-2xl border border-border bg-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <CalendarDays size={15} className="text-primary" /> Upcoming sessions
-            </h2>
-            <Link href="/sessions" className="text-xs text-primary hover:underline font-medium">View all →</Link>
-          </div>
-          {recentSessions.length > 0 ? (
-            <div className="space-y-2">
-              {recentSessions.map((session: GymSessionRow) => {
-                const gym = getSessionGym(session.gyms);
-                return (
-                  <div key={session.id} className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5 hover:bg-muted/60 transition-colors">
-                    <div>
-                      <p className="text-sm font-semibold">{session.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(session.scheduled_for).toLocaleDateString("ro-RO", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted-foreground bg-muted rounded-lg px-2 py-1 font-medium shrink-0">
-                      {gym?.name ?? "Gym"}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-6 text-center">No upcoming sessions.</p>
-          )}
-        </div>
+        <PrCard highlights={prHighlights} />
+        <RecentWorkoutsCard workouts={recentWorkouts} />
+        <BodyLogsCard logs={recentBodyLogs} />
+        <UpcomingSessionsCard sessions={recentSessions} />
       </section>
     </div>
   );

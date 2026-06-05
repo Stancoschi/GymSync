@@ -4,25 +4,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Dumbbell, Salad, CalendarDays,
-  Rss, Users, Trophy, Search, Bell, Settings,
-  Sigma,
+  Rss, Users, Trophy, Search, Bell, Settings, Sigma,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-
-const navItems: { href: string; label: string; Icon: LucideIcon }[] = [
-  { href: "/dashboard",  label: "Dashboard",  Icon: LayoutDashboard },
-  { href: "/workouts",   label: "Workouts",   Icon: Dumbbell },
-  { href: "/one-rm",     label: "1RM Calc",   Icon: Sigma },
-  { href: "/nutrition",  label: "Nutrition",  Icon: Salad },
-  { href: "/sessions",   label: "Sessions",   Icon: CalendarDays },
-  { href: "/feed",       label: "Feed",       Icon: Rss },
-  { href: "/friends",    label: "Friends",    Icon: Users },
-  { href: "/challenges", label: "Challenges", Icon: Trophy },
-  { href: "/search",     label: "Search",     Icon: Search },
-];
+import { useLanguage } from "@/lib/i18n/language-context";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const { t } = useLanguage();
+
+  const navItems: { href: string; label: string; Icon: LucideIcon }[] = [
+    { href: "/dashboard",  label: t.nav.dashboard,  Icon: LayoutDashboard },
+    { href: "/workouts",   label: t.nav.workouts,   Icon: Dumbbell },
+    { href: "/one-rm",     label: "1RM Calc",        Icon: Sigma },
+    { href: "/nutrition",  label: t.nav.nutrition,  Icon: Salad },
+    { href: "/sessions",   label: t.nav.sessions,   Icon: CalendarDays },
+    { href: "/feed",       label: t.nav.feed,       Icon: Rss },
+    { href: "/friends",    label: t.nav.friends,    Icon: Users },
+    { href: "/challenges", label: t.nav.challenges, Icon: Trophy },
+    { href: "/search",     label: t.nav.search,     Icon: Search },
+  ];
 
   return (
     <nav className="flex-1 px-3 py-3 space-y-0.5">
@@ -31,7 +33,6 @@ export function SidebarNav() {
           href === "/dashboard"
             ? pathname === "/dashboard"
             : pathname.startsWith(href);
-
         return (
           <Link
             key={href}
@@ -50,9 +51,7 @@ export function SidebarNav() {
               }`}
             />
             {label}
-            {isActive && (
-              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-            )}
+            {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />}
           </Link>
         );
       })}
@@ -62,13 +61,14 @@ export function SidebarNav() {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { t } = useLanguage();
 
-  const bottomItems = [
-    navItems[0], // Dashboard
-    navItems[1], // Workouts
-    navItems[3], // Nutrition
-    navItems[4], // Sessions
-    navItems[7], // Challenges
+  const bottomItems: { href: string; label: string; Icon: LucideIcon }[] = [
+    { href: "/dashboard",  label: t.nav.dashboard,  Icon: LayoutDashboard },
+    { href: "/workouts",   label: t.nav.workouts,   Icon: Dumbbell },
+    { href: "/nutrition",  label: t.nav.nutrition,  Icon: Salad },
+    { href: "/sessions",   label: t.nav.sessions,   Icon: CalendarDays },
+    { href: "/challenges", label: t.nav.challenges, Icon: Trophy },
   ];
 
   return (
@@ -78,15 +78,12 @@ export function BottomNav() {
           href === "/dashboard"
             ? pathname === "/dashboard"
             : pathname.startsWith(href);
-
         return (
           <Link
             key={href}
             href={href}
             className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all ${
-              isActive
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
+              isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
@@ -100,11 +97,12 @@ export function BottomNav() {
 
 export function SidebarFooterLinks() {
   const pathname = usePathname();
+  const { t } = useLanguage();
   return (
     <div className="space-y-0.5">
       {([
-        { href: "/notifications", label: "Notifications", Icon: Bell },
-        { href: "/settings",      label: "Settings",      Icon: Settings },
+        { href: "/notifications", label: t.nav.notifications, Icon: Bell },
+        { href: "/settings",      label: t.nav.settings,      Icon: Settings },
       ] as const).map(({ href, label, Icon }) => (
         <Link
           key={href}
@@ -119,6 +117,9 @@ export function SidebarFooterLinks() {
           {label}
         </Link>
       ))}
+      <div className="px-3 pt-2">
+        <LanguageToggle />
+      </div>
     </div>
   );
 }

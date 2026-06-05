@@ -1,9 +1,14 @@
 "use client";
 
 import { useTransition } from "react";
-import { startWorkoutFromTemplate } from "@/app/templates/actions";
+import { startWorkoutFromTemplate } from "@/app/workouts/templates/actions";
+import { useLanguage } from "@/lib/i18n/language-context";
 
 export function StartWorkoutFromTemplateForm({ templateId }: { templateId: string }) {
+  const { t } = useLanguage();
+  const w = t.workouts;
+  const c = t.common;
+
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -20,7 +25,7 @@ export function StartWorkoutFromTemplateForm({ templateId }: { templateId: strin
         disabled={isPending}
         className="rounded-xl bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-80 transition-opacity disabled:opacity-50 shrink-0"
       >
-        {isPending ? "Se pornește..." : "Start Workout"}
+        {isPending ? c.loading : w.startWorkout}
       </button>
     </form>
   );

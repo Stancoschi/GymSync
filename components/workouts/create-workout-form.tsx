@@ -1,6 +1,7 @@
 "use client";
 
 import { createWorkout } from "@/app/workouts/actions";
+import { useLanguage } from "@/lib/i18n/language-context";
 
 type Exercise = {
   id: string;
@@ -9,13 +10,16 @@ type Exercise = {
 };
 
 export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
+  const { t } = useLanguage();
+  const w = t.workouts;
+
   return (
     <form action={createWorkout} className="space-y-4 rounded-2xl border p-6">
-      <h2 className="text-lg font-semibold">Create workout</h2>
+      <h2 className="text-lg font-semibold">{w.newWorkout}</h2>
 
       <div className="space-y-2">
         <label htmlFor="title" className="text-sm font-medium">
-          Title
+          {w.workoutName}
         </label>
         <input
           id="title"
@@ -28,7 +32,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
       <div className="space-y-2">
         <label htmlFor="workout_date" className="text-sm font-medium">
-          Workout date
+          {w.workoutDate}
         </label>
         <input
           id="workout_date"
@@ -41,7 +45,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
       <div className="space-y-2">
         <label htmlFor="duration_minutes" className="text-sm font-medium">
-          Duration (minutes)
+          {w.duration} ({w.minutes})
         </label>
         <input
           id="duration_minutes"
@@ -55,7 +59,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
       <div className="space-y-2">
         <label htmlFor="exercise_id" className="text-sm font-medium">
-          Exercise
+          {w.selectExercise}
         </label>
         <select
           id="exercise_id"
@@ -63,7 +67,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
           required
           className="w-full rounded-md border px-3 py-2"
         >
-          <option value="">Select exercise</option>
+          <option value="">{w.selectExercise}</option>
           {exercises.map((exercise) => (
             <option key={exercise.id} value={exercise.id}>
               {exercise.name} {exercise.muscle_group ? `- ${exercise.muscle_group}` : ""}
@@ -73,67 +77,31 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Set 1</p>
-          <input
-            name="set1_reps"
-            type="number"
-            min="1"
-            className="w-full rounded-md border px-3 py-2"
-            placeholder="Reps"
-          />
-          <input
-            name="set1_weight"
-            type="number"
-            min="0"
-            step="0.5"
-            className="w-full rounded-md border px-3 py-2"
-            placeholder="Weight kg"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Set 2</p>
-          <input
-            name="set2_reps"
-            type="number"
-            min="1"
-            className="w-full rounded-md border px-3 py-2"
-            placeholder="Reps"
-          />
-          <input
-            name="set2_weight"
-            type="number"
-            min="0"
-            step="0.5"
-            className="w-full rounded-md border px-3 py-2"
-            placeholder="Weight kg"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Set 3</p>
-          <input
-            name="set3_reps"
-            type="number"
-            min="1"
-            className="w-full rounded-md border px-3 py-2"
-            placeholder="Reps"
-          />
-          <input
-            name="set3_weight"
-            type="number"
-            min="0"
-            step="0.5"
-            className="w-full rounded-md border px-3 py-2"
-            placeholder="Weight kg"
-          />
-        </div>
+        {[1, 2, 3].map((n) => (
+          <div key={n} className="space-y-2">
+            <p className="text-sm font-medium">{w.sets} {n}</p>
+            <input
+              name={`set${n}_reps`}
+              type="number"
+              min="1"
+              className="w-full rounded-md border px-3 py-2"
+              placeholder={w.repsRange}
+            />
+            <input
+              name={`set${n}_weight`}
+              type="number"
+              min="0"
+              step="0.5"
+              className="w-full rounded-md border px-3 py-2"
+              placeholder={w.kg}
+            />
+          </div>
+        ))}
       </div>
 
       <div className="space-y-2">
         <label htmlFor="notes" className="text-sm font-medium">
-          Notes
+          {w.notes}
         </label>
         <textarea
           id="notes"
@@ -147,7 +115,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
         type="submit"
         className="rounded-md bg-black text-white px-4 py-2"
       >
-        Save workout
+        {w.saveWorkout}
       </button>
     </form>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useLanguage } from "@/lib/i18n/language-context";
 
 type Exercise = {
   id: string;
@@ -11,9 +12,7 @@ type Exercise = {
 
 interface ExerciseComboboxProps {
   exercises?: Exercise[];
-  /** Name of the hidden input that carries the selected id to the server action */
   inputName?: string;
-  /** Pre-selected exercise id (for edit flows) */
   defaultValue?: string;
 }
 
@@ -22,6 +21,9 @@ export function ExerciseCombobox({
   inputName = "exercise_id",
   defaultValue = "",
 }: ExerciseComboboxProps) {
+  const { t } = useLanguage();
+  const w = t.workouts;
+
   const listboxId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -43,7 +45,6 @@ export function ExerciseCombobox({
           (e.muscle_group ?? "").toLowerCase().includes(query.toLowerCase())
         );
 
-  // Close on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
@@ -66,7 +67,6 @@ export function ExerciseCombobox({
       return;
     }
     if (!open) return;
-
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
@@ -89,7 +89,6 @@ export function ExerciseCombobox({
     }
   }
 
-  // Scroll active item into view
   useEffect(() => {
     if (activeIndex < 0 || !listRef.current) return;
     const item = listRef.current.children[activeIndex] as HTMLElement | undefined;
@@ -100,10 +99,7 @@ export function ExerciseCombobox({
 
   return (
     <div ref={containerRef} className="relative">
-      {/* Hidden input for form submission */}
       <input type="hidden" name={inputName} value={selectedId} />
-
-      {/* Search input */}
       <div className="relative">
         <input
           ref={inputRef}
@@ -116,20 +112,19 @@ export function ExerciseCombobox({
             activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined
           }
           value={query}
-          placeholder="Search exercises…"
+          placeholder={w.searchExercise ?? "Search exercises…"}
           autoComplete="off"
           required={!selectedId}
           onFocus={() => setOpen(true)}
           onChange={(e) => {
             setQuery(e.target.value);
-            setSelectedId(""); // clear selection when typing
+            setSelectedId("");
             setOpen(true);
             setActiveIndex(-1);
           }}
           onKeyDown={handleKeyDown}
           className="w-full rounded-xl border border-border bg-muted px-4 py-2.5 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
-        {/* Chevron icon */}
         <span
           aria-hidden
           onClick={() => { setOpen((o) => !o); inputRef.current?.focus(); }}
@@ -141,7 +136,6 @@ export function ExerciseCombobox({
         </span>
       </div>
 
-      {/* Selected exercise badge */}
       {selectedExercise && (
         <p className="mt-1.5 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{selectedExercise.name}</span>
@@ -152,12 +146,10 @@ export function ExerciseCombobox({
 
       {exercises.length === 0 && (
         <p className="mt-2 text-sm text-muted-foreground">
-          No exercises in library yet. Add some from the{" "}
-          <a href="/workouts" className="underline">workouts</a> page.
+          {w.noExercisesYet ?? "No exercises in library yet."}
         </p>
       )}
 
-      {/* Dropdown listbox */}
       {open && exercises.length > 0 && (
         <ul
           ref={listRef}
@@ -167,7 +159,9 @@ export function ExerciseCombobox({
           className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-border bg-card py-1 shadow-lg"
         >
           {filtered.length === 0 ? (
-            <li className="px-4 py-3 text-sm text-muted-foreground">No exercises found</li>
+            <li className="px-4 py-3 text-sm text-muted-foreground">
+              {w.noExerciseFound ?? "No exercises found"}
+            </li>
           ) : (
             filtered.map((exercise, i) => (
               <li
@@ -176,7 +170,7 @@ export function ExerciseCombobox({
                 role="option"
                 aria-selected={exercise.id === selectedId}
                 onMouseDown={(e) => {
-                  e.preventDefault(); // prevent blur before click registers
+                  e.preventDefault();
                   handleSelect(exercise);
                 }}
                 onMouseEnter={() => setActiveIndex(i)}
@@ -191,9 +185,7 @@ export function ExerciseCombobox({
                 <span className="font-medium">{exercise.name}</span>
                 {(exercise.muscle_group || exercise.equipment) && (
                   <span className="ml-2 text-xs text-muted-foreground">
-                    {[exercise.muscle_group, exercise.equipment]
-                      .filter(Boolean)
-                      .join(" • ")}
+                    {[exercise.muscle_group, exercise.equipment].filter(Boolean).join(" • ")}
                   </span>
                 )}
               </li>

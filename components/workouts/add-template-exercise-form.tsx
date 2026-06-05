@@ -2,6 +2,7 @@
 
 import { addTemplateExercise } from "@/app/workouts/actions";
 import { ExerciseCombobox } from "./exercise-combobox";
+import { useLanguage } from "@/lib/i18n/language-context";
 
 type Exercise = {
   id: string;
@@ -19,19 +20,22 @@ export function AddTemplateExerciseForm({
   exercises: Exercise[];
   nextOrderIndex: number;
 }) {
+  const { t } = useLanguage();
+  const w = t.workouts;
+
   return (
     <form action={addTemplateExercise} className="space-y-4">
       <input type="hidden" name="workout_template_id" value={workoutTemplateId ?? ""} />
       <input type="hidden" name="order_index" value={nextOrderIndex ?? 1} />
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Exercise</label>
+        <label className="text-sm font-medium">{w.selectExercise ?? "Exercise"}</label>
         <ExerciseCombobox exercises={exercises} inputName="exercise_id" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <label htmlFor="target_sets" className="text-sm font-medium">Target sets</label>
+          <label htmlFor="target_sets" className="text-sm font-medium">{w.sets ?? "Target sets"}</label>
           <input
             id="target_sets"
             name="target_sets"
@@ -42,7 +46,6 @@ export function AddTemplateExerciseForm({
             required
           />
         </div>
-
         <div className="space-y-2">
           <label htmlFor="target_rir" className="text-sm font-medium">Target RIR</label>
           <input
@@ -71,7 +74,6 @@ export function AddTemplateExerciseForm({
             required
           />
         </div>
-
         <div className="space-y-2">
           <label htmlFor="max_reps" className="text-sm font-medium">Max reps</label>
           <input
@@ -100,7 +102,7 @@ export function AddTemplateExerciseForm({
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="notes" className="text-sm font-medium">Notes</label>
+        <label htmlFor="notes" className="text-sm font-medium">{w.notes ?? "Notes"}</label>
         <textarea
           id="notes"
           name="notes"
@@ -114,7 +116,7 @@ export function AddTemplateExerciseForm({
         type="submit"
         className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
       >
-        Add exercise
+        {w.addExercise ?? "Add exercise"}
       </button>
     </form>
   );
