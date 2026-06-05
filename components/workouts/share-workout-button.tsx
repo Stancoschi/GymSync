@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { shareWorkoutToFeed } from "@/app/workouts/actions";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/lib/i18n/language-context";
 
 export function ShareWorkoutButton({ workoutId }: { workoutId: string }) {
@@ -40,22 +39,18 @@ export function ShareWorkoutButton({ workoutId }: { workoutId: string }) {
         </Button>
       ) : (
         <div className="space-y-2">
-          <Textarea
+          <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder={w.shareMessage}
             rows={2}
-            className="resize-none text-sm"
+            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <div className="flex gap-2">
             <Button size="sm" onClick={handleShare} disabled={isPending}>
               {isPending ? c.loading : w.shareWorkout}
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-            >
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
               {c.cancel}
             </Button>
           </div>

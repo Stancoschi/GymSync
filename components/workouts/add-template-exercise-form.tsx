@@ -6,7 +6,6 @@ import { ExerciseCombobox } from "./exercise-combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/lib/i18n/language-context";
 
 type ExerciseOption = {
@@ -70,58 +69,33 @@ export function AddTemplateExerciseForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs">{w.sets}</Label>
-          <Input
-            type="number"
-            min={1}
-            value={targetSets}
-            onChange={(e) => setTargetSets(e.target.value)}
-          />
+          <Input type="number" min={1} value={targetSets} onChange={(e) => setTargetSets(e.target.value)} />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">RIR</Label>
-          <Input
-            type="number"
-            min={0}
-            max={5}
-            value={targetRir}
-            onChange={(e) => setTargetRir(e.target.value)}
-          />
+          <Input type="number" min={0} max={5} value={targetRir} onChange={(e) => setTargetRir(e.target.value)} />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Min {s.reps}</Label>
-          <Input
-            type="number"
-            min={1}
-            value={minReps}
-            onChange={(e) => setMinReps(e.target.value)}
-          />
+          <Input type="number" min={1} value={minReps} onChange={(e) => setMinReps(e.target.value)} />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Max {s.reps}</Label>
-          <Input
-            type="number"
-            min={1}
-            value={maxReps}
-            onChange={(e) => setMaxReps(e.target.value)}
-          />
+          <Input type="number" min={1} value={maxReps} onChange={(e) => setMaxReps(e.target.value)} />
         </div>
       </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs">{w.notes}</Label>
-        <Textarea
+        <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
-          className="resize-none"
+          className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
 
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={isPending || !exerciseId}
-      >
+      <Button type="submit" className="w-full" disabled={isPending || !exerciseId}>
         {isPending ? c.loading : `+ ${w.addExercise}`}
       </Button>
     </form>

@@ -7,7 +7,6 @@ import { ExerciseCombobox } from "./exercise-combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/lib/i18n/language-context";
 
 type ExerciseOption = {
@@ -38,9 +37,7 @@ export function CreateWorkoutForm({
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>(
     [{ exercise_library_id: "", sets: 3, reps: "8-12", weight_kg: "", notes: "" }]
   );
-  const [date, setDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [duration, setDuration] = useState("");
 
   function addExercise() {
@@ -89,9 +86,7 @@ export function CreateWorkoutForm({
           />
         </div>
         <div className="space-y-1.5">
-          <Label>
-            {w.duration} ({w.minutes})
-          </Label>
+          <Label>{w.duration} ({w.minutes})</Label>
           <Input
             type="number"
             min={1}
@@ -106,9 +101,7 @@ export function CreateWorkoutForm({
         {workoutExercises.map((ex, idx) => (
           <div key={idx} className="rounded-xl border p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-muted-foreground">
-                #{idx + 1}
-              </span>
+              <span className="text-sm font-medium text-muted-foreground">#{idx + 1}</span>
               {workoutExercises.length > 1 && (
                 <button
                   type="button"
@@ -126,14 +119,12 @@ export function CreateWorkoutForm({
             />
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1">
-                <Label className="text-xs">{w.exercises.slice(0, -1)}</Label>
+                <Label className="text-xs">{w.sets}</Label>
                 <Input
                   type="number"
                   min={1}
                   value={ex.sets}
-                  onChange={(e) =>
-                    updateExercise(idx, "sets", parseInt(e.target.value))
-                  }
+                  onChange={(e) => updateExercise(idx, "sets", parseInt(e.target.value))}
                   placeholder="3"
                 />
               </div>
@@ -152,20 +143,18 @@ export function CreateWorkoutForm({
                   min={0}
                   step={0.5}
                   value={ex.weight_kg}
-                  onChange={(e) =>
-                    updateExercise(idx, "weight_kg", e.target.value)
-                  }
+                  onChange={(e) => updateExercise(idx, "weight_kg", e.target.value)}
                   placeholder="60"
                 />
               </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">{w.notes}</Label>
-              <Textarea
+              <textarea
                 value={ex.notes}
                 onChange={(e) => updateExercise(idx, "notes", e.target.value)}
                 rows={2}
-                className="resize-none"
+                className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
           </div>
