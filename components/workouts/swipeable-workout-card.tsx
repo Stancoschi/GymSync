@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Clock, Share2, Trash2, Edit3 } from "lucide-react";
+import { Clock, Share2, Trash2, Edit3, MoreHorizontal } from "lucide-react";
 import { deleteWorkout } from "@/app/workouts/actions";
 import { ShareWorkoutButton } from "./share-workout-button";
 
@@ -21,6 +21,7 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
   const [revealed, setRevealed] = useState<"left" | "right" | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDesktopMenu, setShowDesktopMenu] = useState(false);
   const [isPending, startTransition] = useTransition();
   const startX = useRef(0);
   const currentX = useRef(0);
@@ -61,6 +62,7 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
   function handleDelete() {
     setShowDeleteConfirm(true);
     resetSwipe();
+    setShowDesktopMenu(false);
   }
 
   function confirmDelete() {
@@ -68,30 +70,41 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
     setShowDeleteConfirm(false);
   }
 
+  const displayDate = new Date(w.workout_date).toLocaleDateString("ro-RO", {
+    day: "numeric",
+    month: "short",
+  });
+
   return (
     <>
-      <div className="relative overflow-hidden rounded-2xl">
-        {/* Left action — delete (revealed on swipe left) */}
-        <div className="absolute inset-y-0 right-0 flex items-center px-4 bg-destructive rounded-2xl">
+      <div className="group relative overflow-hidden rounded-2xl">
+        {/* Swipe-left BG — delete */}
+        <div
+          className="absolute inset-y-0 right-0 flex items-center justify-end bg-destructive"
+          style={{ width: 88, borderRadius: "inherit" }}
+        >
           <button
             onClick={handleDelete}
-            className="flex flex-col items-center gap-1 text-white"
+            className="flex flex-col items-center gap-1 text-white w-full items-center justify-center py-3"
             aria-label="Delete workout"
           >
             <Trash2 className="w-5 h-5" />
-            <span className="text-[10px] font-semibold">Delete</span>
+            <span className="text-[10px] font-bold tracking-wide">Delete</span>
           </button>
         </div>
 
-        {/* Right action — share (revealed on swipe right) */}
-        <div className="absolute inset-y-0 left-0 flex items-center px-4 bg-primary rounded-2xl">
+        {/* Swipe-right BG — share */}
+        <div
+          className="absolute inset-y-0 left-0 flex items-center bg-primary"
+          style={{ width: 88, borderRadius: "inherit" }}
+        >
           <button
             onClick={() => { setShowShareModal(true); resetSwipe(); }}
-            className="flex flex-col items-center gap-1 text-primary-foreground"
+            className="flex flex-col items-center gap-1 text-primary-foreground w-full items-center justify-center py-3"
             aria-label="Share workout"
           >
             <Share2 className="w-5 h-5" />
-            <span className="text-[10px] font-semibold">Share</span>
+            <span className="text-[10px] font-bold tracking-wide">Share</span>
           </button>
         </div>
 
@@ -103,22 +116,29 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
           onClick={revealed ? resetSwipe : undefined}
           style={{
             transform: `translateX(${offset}px)`,
-            transition: dragging ? "none" : "transform 0.25s cubic-bezier(0.25,1,0.5,1)",
+            transition: dragging ? "none" : "transform 0.28s cubic-bezier(0.25,1,0.5,1)",
           }}
-          className="relative flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 cursor-grab active:cursor-grabbing select-none"
+          className="relative flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 select-none"
         >
+          {/* Date badge */}
+          <div className="flex-shrink-0 flex flex-col items-center justify-center w-10 h-10 rounded-xl bg-muted/60 text-center leading-none gap-0.5">
+            <span className="text-[13px] font-extrabold tabular-nums leading-none">
+              {new Date(w.workout_date).getDate()}
+            </span>
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {new Date(w.workout_date).toLocaleDateString("ro-RO", { month: "short" })}
+            </span>
+          </div>
+
+          {/* Content */}
           <Link
             href={revealed ? "#" : `/workouts/${w.id}`}
             onClick={(e) => { if (revealed) { e.preventDefault(); resetSwipe(); } }}
             className="flex-1 min-w-0"
+            draggable={false}
           >
-            <p className="text-sm font-semibold truncate">{w.title}</p>
-            <div className="flex items-center gap-3 mt-0.5">
-              <span className="text-xs text-muted-foreground">
-                {new Date(w.workout_date).toLocaleDateString("ro-RO", {
-                  weekday: "short", day: "numeric", month: "short",
-                })}
-              </span>
+            <p className="text-sm font-semibold truncate leading-snug">{w.title}</p>
+            <div className="flex items-center gap-2.5 mt-0.5 flex-wrap">
               {w.duration_minutes && (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="w-3 h-3" />
@@ -126,7 +146,7 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
                 </span>
               )}
               {w.is_shared_to_feed && (
-                <span className="inline-flex items-center gap-1 text-xs text-primary">
+                <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
                   <Share2 className="w-3 h-3" />
                   Shared
                 </span>
@@ -134,34 +154,54 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
             </div>
           </Link>
 
-          {/* Desktop action buttons (hover) */}
-          <div className="hidden md:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Link
-              href={`/workouts/${w.id}/edit`}
-              className="p-1.5 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Edit"
-            >
-              <Edit3 className="w-4 h-4" />
-            </Link>
+          {/* Desktop ··· menu */}
+          <div className="relative hidden md:block shrink-0">
             <button
-              onClick={handleDelete}
-              className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-              aria-label="Delete"
+              onClick={() => setShowDesktopMenu((v) => !v)}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 opacity-0 group-hover:opacity-100 transition-all"
+              aria-label="Options"
             >
-              <Trash2 className="w-4 h-4" />
+              <MoreHorizontal className="w-4 h-4" />
             </button>
+            {showDesktopMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowDesktopMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 z-20 min-w-[160px] rounded-xl border border-border bg-card shadow-xl py-1">
+                  <Link
+                    href={`/workouts/${w.id}/edit`}
+                    onClick={() => setShowDesktopMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium hover:bg-muted/50 transition-colors"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" /> Edit
+                  </Link>
+                  <button
+                    onClick={() => { setShowShareModal(true); setShowDesktopMenu(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium hover:bg-muted/50 transition-colors"
+                  >
+                    <Share2 className="w-3.5 h-3.5" /> Share to feed
+                  </button>
+                  <div className="my-1 border-t border-border" />
+                  <button
+                    onClick={handleDelete}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Delete confirm modal */}
+      {/* Delete confirm */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 space-y-4 shadow-2xl">
             <div className="space-y-1">
-              <p className="font-semibold">Delete workout?</p>
+              <p className="font-semibold">Ștergi sesiunea?</p>
               <p className="text-sm text-muted-foreground">
-                &ldquo;{w.title}&rdquo; will be permanently removed.
+                &ldquo;{w.title}&rdquo; va fi ștearsă definitiv.
               </p>
             </div>
             <div className="flex gap-2">
@@ -169,14 +209,14 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
                 onClick={() => setShowDeleteConfirm(false)}
                 className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-muted/30 transition-colors"
               >
-                Cancel
+                Anulează
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={isPending}
                 className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
               >
-                {isPending ? "Deleting..." : "Delete"}
+                {isPending ? "Se șterge..." : "Șterge"}
               </button>
             </div>
           </div>
@@ -185,9 +225,9 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
 
       {/* Share modal */}
       {showShareModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 space-y-4 shadow-2xl">
-            <p className="font-semibold">Share to feed</p>
+            <p className="font-semibold">Distribuie în feed</p>
             <ShareWorkoutButton
               workoutId={w.id}
               isShared={w.is_shared_to_feed ?? false}
@@ -197,7 +237,7 @@ export function SwipeableWorkoutCard({ workout: w }: { workout: Workout }) {
               onClick={() => setShowShareModal(false)}
               className="w-full rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-muted/30 transition-colors"
             >
-              Cancel
+              Anulează
             </button>
           </div>
         </div>
