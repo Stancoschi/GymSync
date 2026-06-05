@@ -15,11 +15,11 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
   return (
     <form action={createWorkout} className="space-y-4 rounded-2xl border p-6">
-      <h2 className="text-lg font-semibold">{w.newWorkout ?? "Create workout"}</h2>
+      <h2 className="text-lg font-semibold">{w.newWorkout}</h2>
 
       <div className="space-y-2">
         <label htmlFor="title" className="text-sm font-medium">
-          {w.workoutName ?? "Title"}
+          {w.workoutName}
         </label>
         <input
           id="title"
@@ -32,7 +32,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
       <div className="space-y-2">
         <label htmlFor="workout_date" className="text-sm font-medium">
-          {w.workoutDate ?? "Workout date"}
+          {w.workoutDate}
         </label>
         <input
           id="workout_date"
@@ -45,7 +45,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
       <div className="space-y-2">
         <label htmlFor="duration_minutes" className="text-sm font-medium">
-          {w.duration ?? "Duration"} ({w.minutes ?? "minutes"})
+          {w.duration} ({w.minutes})
         </label>
         <input
           id="duration_minutes"
@@ -59,7 +59,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
       <div className="space-y-2">
         <label htmlFor="exercise_id" className="text-sm font-medium">
-          {w.selectExercise ?? "Exercise"}
+          {w.selectExercise}
         </label>
         <select
           id="exercise_id"
@@ -67,7 +67,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
           required
           className="w-full rounded-md border px-3 py-2"
         >
-          <option value="">{w.selectExercise ?? "Select exercise"}</option>
+          <option value="">{w.selectExercise}</option>
           {exercises.map((exercise) => (
             <option key={exercise.id} value={exercise.id}>
               {exercise.name} {exercise.muscle_group ? `- ${exercise.muscle_group}` : ""}
@@ -79,13 +79,13 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
       <div className="grid gap-4 md:grid-cols-3">
         {[1, 2, 3].map((n) => (
           <div key={n} className="space-y-2">
-            <p className="text-sm font-medium">{w.sets ? `${w.sets} ${n}` : `Set ${n}`}</p>
+            <p className="text-sm font-medium">{w.sets} {n}</p>
             <input
               name={`set${n}_reps`}
               type="number"
               min="1"
               className="w-full rounded-md border px-3 py-2"
-              placeholder={w.repsRange ?? "Reps"}
+              placeholder={w.repsRange}
             />
             <input
               name={`set${n}_weight`}
@@ -93,7 +93,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
               min="0"
               step="0.5"
               className="w-full rounded-md border px-3 py-2"
-              placeholder={w.kg ? `${w.kg}` : "Weight kg"}
+              placeholder={w.kg}
             />
           </div>
         ))}
@@ -101,7 +101,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
 
       <div className="space-y-2">
         <label htmlFor="notes" className="text-sm font-medium">
-          {w.notes ?? "Notes"}
+          {w.notes}
         </label>
         <textarea
           id="notes"
@@ -115,7 +115,7 @@ export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
         type="submit"
         className="rounded-md bg-black text-white px-4 py-2"
       >
-        {w.saveWorkout ?? "Save workout"}
+        {w.saveWorkout}
       </button>
     </form>
   );

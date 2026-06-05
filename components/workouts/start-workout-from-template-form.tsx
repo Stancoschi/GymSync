@@ -25,7 +25,7 @@ export function StartWorkoutFromTemplateForm({ templateId }: { templateId: strin
         disabled={isPending}
         className="rounded-xl bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-80 transition-opacity disabled:opacity-50 shrink-0"
       >
-        {isPending ? c.loading : (w.startWorkout ?? "Start Workout")}
+        {isPending ? c.loading : w.startWorkout}
       </button>
     </form>
   );

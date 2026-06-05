@@ -11,7 +11,7 @@ export function CreateWorkoutTemplateForm() {
     <form action={createWorkoutTemplate} className="max-w-2xl space-y-6 rounded-2xl border p-6">
       <div className="space-y-2">
         <label htmlFor="name" className="text-sm font-medium">
-          {w.workoutName ?? "Workout name"}
+          {w.workoutName}
         </label>
         <input
           id="name"
@@ -25,7 +25,7 @@ export function CreateWorkoutTemplateForm() {
 
       <div className="space-y-2">
         <label htmlFor="description" className="text-sm font-medium">
-          {w.description ?? "Description"}
+          {w.description}
         </label>
         <textarea
           id="description"
@@ -40,7 +40,7 @@ export function CreateWorkoutTemplateForm() {
         type="submit"
         className="rounded-xl bg-black px-6 py-3 text-white"
       >
-        {w.createTemplate ?? "Create workout"}
+        {w.createTemplate}
       </button>
     </form>
   );
