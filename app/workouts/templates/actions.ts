@@ -4,13 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Creates a live workout_session from a template.
- * For each template_exercise:
- *   1. upsert into exercise_library by name (so the live session page works)
- *   2. insert into workout_session_exercises
- * Then redirects to /sessions/[id]
- */
 export async function startWorkoutFromTemplate(formData: FormData) {
   const supabase = await createClient();
 
@@ -48,7 +41,7 @@ export async function startWorkoutFromTemplate(formData: FormData) {
     .from("workout_sessions")
     .insert({
       user_id: user.id,
-      template_id: templateId,
+      workout_template_id: templateId,
       status: "active",
       started_at: new Date().toISOString(),
     })
@@ -65,7 +58,6 @@ export async function startWorkoutFromTemplate(formData: FormData) {
   for (const [index, ex] of exercises.entries()) {
     const name = (ex as any).exercise_name as string;
 
-    // upsert exercise_library — ON CONFLICT (name) DO NOTHING, then fetch
     await supabase
       .from("exercise_library")
       .upsert({ name }, { onConflict: "name", ignoreDuplicates: true });
@@ -78,7 +70,6 @@ export async function startWorkoutFromTemplate(formData: FormData) {
 
     if (!libEx) continue;
 
-    // Parse reps: "8" -> min 8 max 8 | "15/15" -> min 15 max 15 | "4" -> min 4 max 4
     const rawReps = (ex as any).reps as string;
     const repsParsed = rawReps === "AMRAP" ? null : parseInt(rawReps.split("/")[0], 10);
 
