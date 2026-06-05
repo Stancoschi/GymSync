@@ -2,18 +2,17 @@
 
 import { useLanguage } from "@/lib/i18n/language-context";
 
-export function LanguageToggle() {
+export function LanguageToggle({ className = "" }: { className?: string }) {
   const { lang, setLang } = useLanguage();
-
   return (
     <button
       onClick={() => setLang(lang === "en" ? "ro" : "en")}
-      className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1 text-xs font-semibold tracking-wide hover:bg-muted/80 transition-colors"
-      aria-label={lang === "en" ? "Switch to Romanian" : "Schimbă în engleză"}
+      className={`flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all w-full justify-center ${className}`}
+      aria-label="Switch language"
     >
-      <span className={lang === "en" ? "text-foreground" : "text-muted-foreground">EN</span>
-      <span className="text-muted-foreground">/</span>
-      <span className={lang === "ro" ? "text-foreground" : "text-muted-foreground"}>RO</span>
+      <span className={lang === "en" ? "text-foreground" : "text-muted-foreground/50"}>EN</span>
+      <span className="text-muted-foreground/40">/</span>
+      <span className={lang === "ro" ? "text-foreground" : "text-muted-foreground/50"}>RO</span>
     </button>
   );
 }
