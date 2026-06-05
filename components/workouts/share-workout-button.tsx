@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { shareWorkoutToFeed } from "@/app/workouts/actions";
+import { shareWorkoutToFeed } from "@/app/workouts/share-actions";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/i18n/language-context";
 
