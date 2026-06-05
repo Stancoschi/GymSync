@@ -21,12 +21,32 @@ export default async function WorkoutsPage({
     .eq("user_id", user.id)
     .order("workout_date", { ascending: false });
 
-  const { data: templates } = await supabase
+  // Select without is_pinned first — add it only after migration is applied
+  const { data: templatesRaw, error: tErr } = await supabase
     .from("workout_templates")
     .select("id, name, description, is_pinned")
     .or(`user_id.eq.${user.id},is_public.eq.true`)
-    .order("is_pinned", { ascending: false })
     .order("name");
+
+  // If is_pinned column doesn't exist yet, fall back to query without it
+  let templates: Array<{ id: string; name: string; description: string | null; is_pinned: boolean | null }> = [];
+
+  if (tErr) {
+    // Column likely missing — fetch without is_pinned
+    const { data: fallback } = await supabase
+      .from("workout_templates")
+      .select("id, name, description")
+      .or(`user_id.eq.${user.id},is_public.eq.true`)
+      .order("name");
+    templates = (fallback ?? []).map((t) => ({ ...t, is_pinned: null }));
+  } else {
+    // Sort pinned first client-side (Supabase .order on bool can be unreliable)
+    const all = templatesRaw ?? [];
+    templates = [
+      ...all.filter((t) => t.is_pinned),
+      ...all.filter((t) => !t.is_pinned),
+    ];
+  }
 
   return (
     <main className="p-4 md:p-6 space-y-8 page-enter pb-28 md:pb-6">
@@ -52,7 +72,7 @@ export default async function WorkoutsPage({
       </div>
 
       {/* Templates first */}
-      <TemplatesSection templates={templates ?? []} />
+      <TemplatesSection templates={templates} />
 
       {/* History below */}
       <WorkoutHistorySection workouts={workouts ?? []} />
