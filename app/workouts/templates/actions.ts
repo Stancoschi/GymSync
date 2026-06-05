@@ -7,10 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function startWorkoutFromTemplate(formData: FormData) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
   const templateId = formData.get("template_id") as string;
@@ -36,6 +33,10 @@ export async function startWorkoutFromTemplate(formData: FormData) {
     (a: any, b: any) => a.sort_order - b.sort_order
   );
 
+  if (exercises.length === 0) {
+    redirect("/workouts/templates?message=Template+has+no+exercises");
+  }
+
   // 2. Create workout_session
   const { data: session, error: sessionError } = await supabase
     .from("workout_sessions")
@@ -49,41 +50,55 @@ export async function startWorkoutFromTemplate(formData: FormData) {
     .single();
 
   if (sessionError || !session) {
-    redirect(
-      `/workouts/templates?message=${encodeURIComponent(sessionError?.message ?? "Failed to create session")}`
-    );
+    redirect(`/workouts/templates?message=${encodeURIComponent(sessionError?.message ?? "Failed to create session")}`);
   }
 
-  // 3. For each exercise: upsert into exercise_library by name, then add to session
-  for (const [index, ex] of exercises.entries()) {
-    const name = (ex as any).exercise_name as string;
+  // 3. Bulk fetch exercise_library ids by name (no upsert loop)
+  const exerciseNames = exercises.map((ex: any) => ex.exercise_name as string);
 
-    await supabase
-      .from("exercise_library")
-      .upsert({ name }, { onConflict: "name", ignoreDuplicates: true });
+  const { data: libraryExercises, error: libraryError } = await supabase
+    .from("exercise_library")
+    .select("id, name")
+    .in("name", exerciseNames);
 
-    const { data: libEx } = await supabase
-      .from("exercise_library")
-      .select("id")
-      .eq("name", name)
-      .single();
+  if (libraryError || !libraryExercises || libraryExercises.length === 0) {
+    redirect(`/workouts/templates?message=${encodeURIComponent("Exercises not found in library: " + (libraryError?.message ?? "empty"))}`);
+  }
 
-    if (!libEx) continue;
+  const nameToId = new Map<string, string>(
+    libraryExercises.map((ex: any) => [ex.name, ex.id])
+  );
 
-    const rawReps = (ex as any).reps as string;
-    const repsParsed = rawReps === "AMRAP" ? null : parseInt(rawReps.split("/")[0], 10);
+  // 4. Bulk insert workout_session_exercises
+  const toInsert = exercises
+    .map((ex: any, index: number) => {
+      const exerciseId = nameToId.get(ex.exercise_name);
+      if (!exerciseId) return null;
 
-    await supabase.from("workout_session_exercises").insert({
-      workout_session_id: session.id,
-      exercise_id: libEx.id,
-      order_index: index + 1,
-      target_sets: (ex as any).sets,
-      min_reps: repsParsed,
-      max_reps: repsParsed,
-      target_rir: null,
-      load_increment: 2.5,
-      notes: (ex as any).notes ?? null,
-    });
+      const rawReps = ex.reps as string;
+      const repsParsed = rawReps === "AMRAP" ? null : parseInt(rawReps.split("/")[0], 10);
+
+      return {
+        workout_session_id: session.id,
+        exercise_id: exerciseId,
+        order_index: index + 1,
+        target_sets: ex.sets,
+        min_reps: repsParsed,
+        max_reps: repsParsed,
+        target_rir: null,
+        load_increment: 2.5,
+      };
+    })
+    .filter(Boolean);
+
+  if (toInsert.length > 0) {
+    const { error: insertError } = await supabase
+      .from("workout_session_exercises")
+      .insert(toInsert as any[]);
+
+    if (insertError) {
+      redirect(`/workouts/templates?message=${encodeURIComponent("Failed to add exercises: " + insertError.message)}`);
+    }
   }
 
   revalidatePath("/workouts");
