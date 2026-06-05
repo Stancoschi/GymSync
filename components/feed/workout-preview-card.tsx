@@ -25,6 +25,7 @@ type WorkoutPreviewCardProps = {
   actor_avatar_url: string | null;
   created_at: string;
   title: string;
+  share_message: string | null;
   duration_minutes: number | null;
   has_pr: boolean;
   exercises: ExerciseSummary[];
@@ -58,6 +59,7 @@ export function WorkoutPreviewCard({
   actor_username,
   created_at,
   title,
+  share_message,
   duration_minutes,
   has_pr,
   exercises,
@@ -73,7 +75,6 @@ export function WorkoutPreviewCard({
 
   return (
     <div className="rounded-2xl border bg-card overflow-hidden">
-      {/* Top accent strip for PR workouts */}
       {has_pr && (
         <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-500" />
       )}
@@ -114,9 +115,12 @@ export function WorkoutPreviewCard({
           </div>
         </div>
 
-        {/* Workout title */}
-        <div>
+        {/* Workout title + optional share message */}
+        <div className="space-y-1">
           <p className="font-bold text-base leading-tight">{title}</p>
+          {share_message && (
+            <p className="text-sm text-muted-foreground italic">&ldquo;{share_message}&rdquo;</p>
+          )}
         </div>
 
         {/* Stats row */}
@@ -167,9 +171,7 @@ export function WorkoutPreviewCard({
                 <div className="text-right shrink-0">
                   <p className="text-sm font-semibold tabular-nums">
                     {ex.sets} ×
-                    {ex.best_weight_kg !== null
-                      ? ` ${ex.best_weight_kg} kg`
-                      : ""}
+                    {ex.best_weight_kg !== null ? ` ${ex.best_weight_kg} kg` : ""}
                   </p>
                   {ex.total_volume_kg > 0 && (
                     <p className="text-xs text-muted-foreground">
