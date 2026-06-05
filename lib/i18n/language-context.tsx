@@ -1,12 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 import { translations, type Lang } from "./translations";
 import { createClient } from "@/lib/supabase/client";
 
+type TranslationSet = (typeof translations)[Lang];
+
 type LanguageContextType = {
   lang: Lang;
-  t: typeof translations.en;
+  t: TranslationSet;
   setLang: (lang: Lang) => Promise<void>;
 };
 
@@ -27,9 +29,7 @@ export function LanguageProvider({
 
   const setLang = useCallback(async (newLang: Lang) => {
     setLangState(newLang);
-    // Persist to cookie for SSR
     document.cookie = `gymsync-lang=${newLang};path=/;max-age=31536000;samesite=lax`;
-    // Persist to profiles table
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
