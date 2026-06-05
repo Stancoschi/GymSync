@@ -5,20 +5,29 @@ import { shareWorkoutToFeed } from "@/app/workouts/share-actions";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/i18n/language-context";
 
-export function ShareWorkoutButton({ workoutId }: { workoutId: string }) {
+export function ShareWorkoutButton({
+  workoutId,
+  isShared = false,
+  workoutTitle,
+}: {
+  workoutId: string;
+  isShared?: boolean;
+  workoutTitle?: string;
+}) {
   const { t } = useLanguage();
   const w = t.workouts;
   const c = t.common;
 
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
-  const [shared, setShared] = useState(false);
+  const [shared, setShared] = useState(isShared);
   const [isPending, startTransition] = useTransition();
 
   function handleShare() {
     const fd = new FormData();
     fd.append("workout_id", workoutId);
     if (message) fd.append("message", message);
+    if (workoutTitle) fd.append("workout_title", workoutTitle);
     startTransition(async () => {
       await shareWorkoutToFeed(fd);
       setShared(true);
