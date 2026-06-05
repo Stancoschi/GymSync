@@ -1,173 +1,122 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { createWorkout } from "@/app/workouts/actions";
-import { ExerciseCombobox } from "./exercise-combobox";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/lib/i18n/language-context";
 
-type ExerciseOption = {
+type Exercise = {
   id: string;
   name: string;
   muscle_group: string | null;
 };
 
-type WorkoutExercise = {
-  exercise_library_id: string;
-  sets: number;
-  reps: string;
-  weight_kg: string;
-  notes: string;
-};
-
-export function CreateWorkoutForm({
-  exercises,
-}: {
-  exercises: ExerciseOption[];
-}) {
+export function CreateWorkoutForm({ exercises }: { exercises: Exercise[] }) {
   const { t } = useLanguage();
   const w = t.workouts;
-  const c = t.common;
-
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>(
-    [{ exercise_library_id: "", sets: 3, reps: "8-12", weight_kg: "", notes: "" }]
-  );
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [duration, setDuration] = useState("");
-
-  function addExercise() {
-    setWorkoutExercises((prev) => [
-      ...prev,
-      { exercise_library_id: "", sets: 3, reps: "8-12", weight_kg: "", notes: "" },
-    ]);
-  }
-
-  function removeExercise(idx: number) {
-    setWorkoutExercises((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function updateExercise(
-    idx: number,
-    field: keyof WorkoutExercise,
-    value: string | number
-  ) {
-    setWorkoutExercises((prev) =>
-      prev.map((ex, i) => (i === idx ? { ...ex, [field]: value } : ex))
-    );
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const fd = new FormData();
-    fd.append("date", date);
-    if (duration) fd.append("duration_minutes", duration);
-    fd.append("exercises_json", JSON.stringify(workoutExercises));
-    startTransition(async () => {
-      await createWorkout(fd);
-      router.refresh();
-    });
-  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label>{w.workoutDate}</Label>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>{w.duration} ({w.minutes})</Label>
-          <Input
-            type="number"
-            min={1}
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            placeholder="60"
-          />
-        </div>
+    <form action={createWorkout} className="space-y-4 rounded-2xl border p-6">
+      <h2 className="text-lg font-semibold">{w.newWorkout ?? "Create workout"}</h2>
+
+      <div className="space-y-2">
+        <label htmlFor="title" className="text-sm font-medium">
+          {w.workoutName ?? "Title"}
+        </label>
+        <input
+          id="title"
+          name="title"
+          required
+          className="w-full rounded-md border px-3 py-2"
+          placeholder="Upper body session"
+        />
       </div>
 
-      <div className="space-y-4">
-        {workoutExercises.map((ex, idx) => (
-          <div key={idx} className="rounded-xl border p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-muted-foreground">#{idx + 1}</span>
-              {workoutExercises.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeExercise(idx)}
-                  className="text-xs text-destructive hover:underline"
-                >
-                  {c.remove}
-                </button>
-              )}
-            </div>
-            <ExerciseCombobox
-              exercises={exercises}
-              value={ex.exercise_library_id}
-              onChange={(v) => updateExercise(idx, "exercise_library_id", v)}
+      <div className="space-y-2">
+        <label htmlFor="workout_date" className="text-sm font-medium">
+          {w.workoutDate ?? "Workout date"}
+        </label>
+        <input
+          id="workout_date"
+          name="workout_date"
+          type="date"
+          required
+          className="w-full rounded-md border px-3 py-2"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="duration_minutes" className="text-sm font-medium">
+          {w.duration ?? "Duration"} ({w.minutes ?? "minutes"})
+        </label>
+        <input
+          id="duration_minutes"
+          name="duration_minutes"
+          type="number"
+          min="1"
+          className="w-full rounded-md border px-3 py-2"
+          placeholder="60"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="exercise_id" className="text-sm font-medium">
+          {w.selectExercise ?? "Exercise"}
+        </label>
+        <select
+          id="exercise_id"
+          name="exercise_id"
+          required
+          className="w-full rounded-md border px-3 py-2"
+        >
+          <option value="">{w.selectExercise ?? "Select exercise"}</option>
+          {exercises.map((exercise) => (
+            <option key={exercise.id} value={exercise.id}>
+              {exercise.name} {exercise.muscle_group ? `- ${exercise.muscle_group}` : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {[1, 2, 3].map((n) => (
+          <div key={n} className="space-y-2">
+            <p className="text-sm font-medium">{w.sets ? `${w.sets} ${n}` : `Set ${n}`}</p>
+            <input
+              name={`set${n}_reps`}
+              type="number"
+              min="1"
+              className="w-full rounded-md border px-3 py-2"
+              placeholder={w.repsRange ?? "Reps"}
             />
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">{w.sets}</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={ex.sets}
-                  onChange={(e) => updateExercise(idx, "sets", parseInt(e.target.value))}
-                  placeholder="3"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{w.repsRange}</Label>
-                <Input
-                  value={ex.reps}
-                  onChange={(e) => updateExercise(idx, "reps", e.target.value)}
-                  placeholder="8-12"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{w.kg}</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  value={ex.weight_kg}
-                  onChange={(e) => updateExercise(idx, "weight_kg", e.target.value)}
-                  placeholder="60"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{w.notes}</Label>
-              <textarea
-                value={ex.notes}
-                onChange={(e) => updateExercise(idx, "notes", e.target.value)}
-                rows={2}
-                className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
+            <input
+              name={`set${n}_weight`}
+              type="number"
+              min="0"
+              step="0.5"
+              className="w-full rounded-md border px-3 py-2"
+              placeholder={w.kg ? `${w.kg}` : "Weight kg"}
+            />
           </div>
         ))}
       </div>
 
-      <Button type="button" variant="outline" onClick={addExercise} className="w-full">
-        + {w.addExercise}
-      </Button>
+      <div className="space-y-2">
+        <label htmlFor="notes" className="text-sm font-medium">
+          {w.notes ?? "Notes"}
+        </label>
+        <textarea
+          id="notes"
+          name="notes"
+          className="w-full rounded-md border px-3 py-2 min-h-[100px]"
+          placeholder="Felt strong today."
+        />
+      </div>
 
-      <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? c.loading : w.newWorkout}
-      </Button>
+      <button
+        type="submit"
+        className="rounded-md bg-black text-white px-4 py-2"
+      >
+        {w.saveWorkout ?? "Save workout"}
+      </button>
     </form>
   );
 }
