@@ -2,7 +2,6 @@ export type Lang = "en" | "ro";
 
 export const translations = {
   en: {
-    // Navigation
     nav: {
       dashboard: "Dashboard",
       feed: "Feed",
@@ -16,7 +15,6 @@ export const translations = {
       search: "Search",
       notifications: "Notifications",
     },
-    // Common
     common: {
       save: "Save",
       cancel: "Cancel",
@@ -39,7 +37,6 @@ export const translations = {
       prev: "Prev",
       noData: "No data yet.",
     },
-    // Auth
     auth: {
       login: "Log in",
       logout: "Log out",
@@ -52,7 +49,6 @@ export const translations = {
       updatePassword: "Update password",
       signedInAs: "Signed in as",
     },
-    // Dashboard
     dashboard: {
       title: "Dashboard",
       greeting: "Hey",
@@ -68,7 +64,6 @@ export const translations = {
       startWorkout: "Start workout",
       viewAll: "View all",
     },
-    // Workouts
     workouts: {
       title: "Workouts",
       newWorkout: "New workout",
@@ -83,30 +78,59 @@ export const translations = {
       shared: "Shared!",
       deleteWorkout: "Delete workout",
       confirmDelete: "Are you sure you want to delete this workout?",
+      templateName: "Template name",
+      selectExercise: "Select exercise",
+      searchExercise: "Search exercises...",
+      noExerciseFound: "No exercise found.",
+      sets: "sets",
+      repsRange: "reps",
+      rir: "RIR",
+      notes: "Notes",
+      addExercise: "Add exercise",
+      createTemplate: "Create template",
+      startFromTemplate: "Start workout",
+      kg: "kg",
     },
-    // Sessions
     sessions: {
       title: "Sessions",
       liveSession: "Live session",
       startSession: "Start session",
       finishSession: "Finish workout",
+      finishSaving: "Saving…",
       pauseSession: "Pause",
       resumeSession: "Resume",
       restTimer: "Rest timer",
+      restHeavy: "Heavy set · 3 min rest",
+      restModerate: "Moderate · 2 min rest",
+      restLight: "Light · 90s rest",
+      skip: "Skip",
       addExercise: "Add exercise",
-      addSet: "Add set",
+      addSet: "Log set",
       removeSet: "Remove set",
-      weight: "Weight",
+      weight: "Weight (kg)",
+      weightShort: "kg",
       reps: "Reps",
       completed: "Completed",
       suggested: "Suggested",
       lastSession: "Last session",
+      lastSessionSet: "Last session set",
       noSessions: "No sessions yet.",
       sessionDuration: "Duration",
       totalSets: "Total sets",
       warmup: "Warmup",
+      target: "Target",
+      allTimeBest: "All-time best",
+      estOneRM: "kg est. 1RM",
+      setOf: "Set",
+      of: "of",
+      setsLeft: "left",
+      allSetsDone: "All sets done",
+      last: "last",
+      previous: "← Previous",
+      nextExercise: "Next exercise →",
+      prBadge: "PR",
+      firstBadge: "★ First",
     },
-    // Templates
     templates: {
       title: "Templates",
       newTemplate: "New template",
@@ -116,7 +140,6 @@ export const translations = {
       noTemplates: "No templates yet. Create one to speed up your workouts!",
       templateName: "Template name",
     },
-    // Feed
     feed: {
       title: "Feed",
       friends: "friend",
@@ -130,7 +153,6 @@ export const translations = {
       workout: "workout",
       session: "session",
     },
-    // Challenges
     challenges: {
       title: "Challenges",
       active: "Active",
@@ -144,7 +166,6 @@ export const translations = {
       winner: "Winner",
       yourRank: "Your rank",
     },
-    // Friends
     friends: {
       title: "Friends",
       addFriend: "Add friend",
@@ -155,7 +176,6 @@ export const translations = {
       noFriends: "No friends yet. Search for users to connect!",
       mutualFriends: "mutual friends",
     },
-    // Settings
     settings: {
       title: "Settings",
       profileAccount: "Profile & account",
@@ -169,7 +189,6 @@ export const translations = {
       deleteAccount: "Delete account",
       deleteAccountWarning: "This action is irreversible. All your data will be permanently deleted.",
     },
-    // Nutrition
     nutrition: {
       title: "Nutrition",
       calories: "Calories",
@@ -181,7 +200,6 @@ export const translations = {
       daily: "Daily",
       goal: "Goal",
     },
-    // Onboarding
     onboarding: {
       title: "Set up your profile",
       goal: "Goal",
@@ -197,7 +215,6 @@ export const translations = {
   },
 
   ro: {
-    // Navigation
     nav: {
       dashboard: "Dashboard",
       feed: "Feed",
@@ -211,7 +228,6 @@ export const translations = {
       search: "Căutare",
       notifications: "Notificări",
     },
-    // Common
     common: {
       save: "Salvează",
       cancel: "Anulează",
@@ -234,7 +250,6 @@ export const translations = {
       prev: "Anterior",
       noData: "Nicio dată încă.",
     },
-    // Auth
     auth: {
       login: "Conectează-te",
       logout: "Deconectează-te",
@@ -247,7 +262,6 @@ export const translations = {
       updatePassword: "Actualizează parola",
       signedInAs: "Conectat ca",
     },
-    // Dashboard
     dashboard: {
       title: "Dashboard",
       greeting: "Salut",
@@ -263,7 +277,6 @@ export const translations = {
       startWorkout: "Începe antrenamentul",
       viewAll: "Vezi toate",
     },
-    // Workouts
     workouts: {
       title: "Antrenamente",
       newWorkout: "Antrenament nou",
@@ -278,30 +291,59 @@ export const translations = {
       shared: "Distribuit!",
       deleteWorkout: "Șterge antrenamentul",
       confirmDelete: "Ești sigur că vrei să ștergi acest antrenament?",
+      templateName: "Nume template",
+      selectExercise: "Selectează exercițiu",
+      searchExercise: "Caută exerciții...",
+      noExerciseFound: "Niciun exercițiu găsit.",
+      sets: "seturi",
+      repsRange: "reps",
+      rir: "RIR",
+      notes: "Notițe",
+      addExercise: "Adaugă exercițiu",
+      createTemplate: "Creează template",
+      startFromTemplate: "Începe antrenamentul",
+      kg: "kg",
     },
-    // Sessions
     sessions: {
       title: "Sesiuni",
       liveSession: "Sesiune live",
       startSession: "Începe sesiunea",
       finishSession: "Termină antrenamentul",
+      finishSaving: "Se salvează…",
       pauseSession: "Pauză",
       resumeSession: "Continuă",
       restTimer: "Timer odihnă",
+      restHeavy: "Set greu · 3 min odihnă",
+      restModerate: "Moderat · 2 min odihnă",
+      restLight: "Ușor · 90s odihnă",
+      skip: "Sari peste",
       addExercise: "Adaugă exercițiu",
-      addSet: "Adaugă set",
+      addSet: "Loghează set",
       removeSet: "Elimină set",
-      weight: "Greutate",
+      weight: "Greutate (kg)",
+      weightShort: "kg",
       reps: "Reps",
       completed: "Completat",
       suggested: "Sugerat",
       lastSession: "Sesiunea trecută",
+      lastSessionSet: "Set sesiunea trecută",
       noSessions: "Nicio sesiune încă.",
       sessionDuration: "Durată",
-      totalSets: "Total sets",
+      totalSets: "Total seturi",
       warmup: "Încălzire",
+      target: "Țintă",
+      allTimeBest: "Cel mai bun vreodată",
+      estOneRM: "kg 1RM estimat",
+      setOf: "Set",
+      of: "din",
+      setsLeft: "rămase",
+      allSetsDone: "Toate seturile gata",
+      last: "ultimul",
+      previous: "← Anterior",
+      nextExercise: "Exercițiu următor →",
+      prBadge: "PR",
+      firstBadge: "★ Primul",
     },
-    // Templates
     templates: {
       title: "Template-uri",
       newTemplate: "Template nou",
@@ -311,7 +353,6 @@ export const translations = {
       noTemplates: "Niciun template încă. Creează unul pentru antrenamente mai rapide!",
       templateName: "Nume template",
     },
-    // Feed
     feed: {
       title: "Feed",
       friends: "prieten",
@@ -325,7 +366,6 @@ export const translations = {
       workout: "antrenament",
       session: "sesiune",
     },
-    // Challenges
     challenges: {
       title: "Provocări",
       active: "Active",
@@ -339,7 +379,6 @@ export const translations = {
       winner: "Câștigător",
       yourRank: "Locul tău",
     },
-    // Friends
     friends: {
       title: "Prieteni",
       addFriend: "Adaugă prieten",
@@ -350,7 +389,6 @@ export const translations = {
       noFriends: "Niciun prieten încă. Caută utilizatori pentru a te conecta!",
       mutualFriends: "prieteni comuni",
     },
-    // Settings
     settings: {
       title: "Setări",
       profileAccount: "Profil & cont",
@@ -364,7 +402,6 @@ export const translations = {
       deleteAccount: "Șterge contul",
       deleteAccountWarning: "Această acțiune este ireversibilă. Toate datele tale vor fi șterse permanent.",
     },
-    // Nutrition
     nutrition: {
       title: "Nutriție",
       calories: "Calorii",
@@ -376,7 +413,6 @@ export const translations = {
       daily: "Zilnic",
       goal: "Obiectiv",
     },
-    // Onboarding
     onboarding: {
       title: "Configurează-ți profilul",
       goal: "Obiectiv",

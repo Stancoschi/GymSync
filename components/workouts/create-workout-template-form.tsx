@@ -1,43 +1,40 @@
 "use client";
 
-import { createWorkoutTemplate } from "@/app/workouts/actions";
+import { useTransition } from "react";
+import { createWorkoutTemplate } from "@/app/workouts/templates/actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/lib/i18n/language-context";
 
 export function CreateWorkoutTemplateForm() {
+  const { t } = useLanguage();
+  const w = t.workouts;
+  const c = t.common;
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      await createWorkoutTemplate(fd);
+    });
+  }
+
   return (
-    <form action={createWorkoutTemplate} className="max-w-2xl space-y-6 rounded-2xl border p-6">
-      <div className="space-y-2">
-        <label htmlFor="name" className="text-sm font-medium">
-          Workout name
-        </label>
-        <input
-          id="name"
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="template-name">{w.templateName}</Label>
+        <Input
+          id="template-name"
           name="name"
-          type="text"
-          placeholder="Push A"
-          className="w-full rounded-xl border px-3 py-2"
+          placeholder={w.templateName}
           required
         />
       </div>
-
-      <div className="space-y-2">
-        <label htmlFor="description" className="text-sm font-medium">
-          Description
-        </label>
-        <textarea
-          id="description"
-          name="description"
-          placeholder="Chest, shoulders, triceps focus"
-          className="w-full rounded-xl border px-3 py-2"
-          rows={4}
-        />
-      </div>
-
-      <button
-        type="submit"
-        className="rounded-xl bg-black px-6 py-3 text-white"
-      >
-        Create workout
-      </button>
+      <Button type="submit" className="w-full" disabled={isPending}>
+        {isPending ? c.loading : w.createTemplate}
+      </Button>
     </form>
   );
 }
