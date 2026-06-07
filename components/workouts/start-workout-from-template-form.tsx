@@ -1,14 +1,10 @@
 "use client";
 
 import { useTransition } from "react";
+import { Play, Loader2 } from "lucide-react";
 import { startWorkoutFromTemplate } from "@/app/workouts/templates/actions";
-import { useLanguage } from "@/lib/i18n/language-context";
 
 export function StartWorkoutFromTemplateForm({ templateId }: { templateId: string }) {
-  const { t } = useLanguage();
-  const w = t.workouts;
-  const c = t.common;
-
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -18,14 +14,19 @@ export function StartWorkoutFromTemplateForm({ templateId }: { templateId: strin
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="shrink-0">
       <input type="hidden" name="template_id" value={templateId} />
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-xl bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-80 transition-opacity disabled:opacity-50 shrink-0"
+        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
       >
-        {isPending ? c.loading : w.startWorkout}
+        {isPending ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Play className="w-4 h-4" />
+        )}
+        {isPending ? "Starting..." : "Start"}
       </button>
     </form>
   );
