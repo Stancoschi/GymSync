@@ -115,6 +115,141 @@ function ssRemove(key: string) {
   try { sessionStorage.removeItem(key); } catch {}
 }
 
+// ─── Hold-to-Finish Button ────────────────────────────────────────────────────
+// Press and hold for HOLD_MS ms to trigger onConfirm.
+// Renders a circular SVG progress ring that fills while held.
+
+const HOLD_MS = 2000;
+const RING_R = 20; // radius of the SVG circle
+const RING_CIRC = 2 * Math.PI * RING_R;
+
+function HoldToFinishButton({
+  onConfirm,
+  disabled,
+  label,
+}: {
+  onConfirm: () => void;
+  disabled: boolean;
+  label: string;
+}) {
+  const [progress, setProgress] = useState(0); // 0–1
+  const holdStart = useRef<number | null>(null);
+  const rafId = useRef<number | null>(null);
+  const fired = useRef(false);
+
+  const cancel = useCallback(() => {
+    if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+    holdStart.current = null;
+    fired.current = false;
+    setProgress(0);
+  }, []);
+
+  const tick = useCallback(() => {
+    if (holdStart.current === null) return;
+    const elapsed = Date.now() - holdStart.current;
+    const p = Math.min(elapsed / HOLD_MS, 1);
+    setProgress(p);
+    if (p >= 1) {
+      if (!fired.current) {
+        fired.current = true;
+        onConfirm();
+      }
+      return;
+    }
+    rafId.current = requestAnimationFrame(tick);
+  }, [onConfirm]);
+
+  const startHold = useCallback((e: React.PointerEvent) => {
+    if (disabled) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    holdStart.current = Date.now();
+    fired.current = false;
+    rafId.current = requestAnimationFrame(tick);
+  }, [disabled, tick]);
+
+  // Cancel on pointer up / leave / cancel
+  useEffect(() => () => { if (rafId.current !== null) cancelAnimationFrame(rafId.current); }, []);
+
+  const dashOffset = RING_CIRC * (1 - progress);
+  const isHolding = progress > 0;
+
+  return (
+    <button
+      onPointerDown={startHold}
+      onPointerUp={cancel}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      disabled={disabled}
+      aria-label={label}
+      style={{ WebkitUserSelect: "none", userSelect: "none", touchAction: "none" }}
+      className={`
+        relative w-full max-w-lg mx-auto flex items-center justify-center gap-3
+        rounded-2xl py-4 text-base font-bold transition-all select-none
+        disabled:opacity-40
+        ${isHolding
+          ? "bg-destructive/10 text-destructive border-2 border-destructive/40"
+          : "bg-primary text-primary-foreground"}
+      `}
+    >
+      {/* Progress ring */}
+      <span className="relative shrink-0" style={{ width: RING_R * 2 + 4, height: RING_R * 2 + 4 }}>
+        <svg
+          width={RING_R * 2 + 4}
+          height={RING_R * 2 + 4}
+          viewBox={`0 0 ${RING_R * 2 + 4} ${RING_R * 2 + 4}`}
+          style={{ transform: "rotate(-90deg)" }}
+          aria-hidden="true"
+        >
+          {/* Track */}
+          <circle
+            cx={RING_R + 2}
+            cy={RING_R + 2}
+            r={RING_R}
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity={0.15}
+            strokeWidth={3}
+          />
+          {/* Fill */}
+          <circle
+            cx={RING_R + 2}
+            cy={RING_R + 2}
+            r={RING_R}
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity={isHolding ? 0.9 : 0}
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeDasharray={RING_CIRC}
+            strokeDashoffset={dashOffset}
+            style={{ transition: isHolding ? "none" : "stroke-opacity 0.2s" }}
+          />
+        </svg>
+        {/* Icon in the center of the ring */}
+        <span
+          className="absolute inset-0 flex items-center justify-center"
+          aria-hidden="true"
+        >
+          {isHolding ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>
+              <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>
+            </svg>
+          )}
+        </span>
+      </span>
+
+      <span className="pointer-events-none">
+        {isHolding ? "Keep holding…" : label}
+      </span>
+    </button>
+  );
+}
+
 // ─── Swap Modal ───────────────────────────────────────────────────────────────
 
 function SwapExerciseModal({
@@ -824,15 +959,27 @@ export function LiveSessionClient({
         </div>
       </div>
 
-      {/* Sticky finish button */}
+      {/* Sticky finish button — hold to confirm */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t border-border">
-        <button
-          onClick={handleFinish}
-          disabled={submitting || loggedSets.length === 0}
-          className="w-full max-w-lg mx-auto block rounded-2xl bg-primary text-primary-foreground py-4 text-base font-bold disabled:opacity-40 transition-opacity active:scale-[0.98]"
-        >
-          {submitting ? s.finishSaving : `${s.finishSession} ${newPrs.length > 0 ? "🏆" : "✓"}`}
-        </button>
+        {!submitting ? (
+          <>
+            <HoldToFinishButton
+              onConfirm={handleFinish}
+              disabled={loggedSets.length === 0}
+              label={`${s.finishSession} ${newPrs.length > 0 ? "🏆" : "✓"}`}
+            />
+            <p className="text-center text-xs text-muted-foreground mt-2 pointer-events-none">
+              Hold 2 seconds to finish
+            </p>
+          </>
+        ) : (
+          <div className="w-full max-w-lg mx-auto flex items-center justify-center gap-2 rounded-2xl bg-primary/10 py-4 text-sm font-semibold text-primary">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+            </svg>
+            {s.finishSaving}
+          </div>
+        )}
       </div>
 
       {/* Swap modal */}
