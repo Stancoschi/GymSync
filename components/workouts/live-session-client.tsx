@@ -103,6 +103,18 @@ const DELTA_STYLES: Record<SetDelta, string> = {
 
 const REST_PRESETS = [60, 90, 120, 180];
 
+// ─── sessionStorage helpers ───────────────────────────────────────────────────
+
+function ssGet(key: string): string | null {
+  try { return sessionStorage.getItem(key); } catch { return null; }
+}
+function ssSet(key: string, value: string) {
+  try { sessionStorage.setItem(key, value); } catch {}
+}
+function ssRemove(key: string) {
+  try { sessionStorage.removeItem(key); } catch {}
+}
+
 // ─── Swap Modal ───────────────────────────────────────────────────────────────
 
 function SwapExerciseModal({
@@ -238,10 +250,24 @@ export function LiveSessionClient({
   const { t } = useLanguage();
   const s = t.sessions;
 
+  // ── sessionStorage keys (scoped per template so parallel sessions don't clash)
+  const START_KEY = `gymsync_session_start_${templateId}`;
+  const SETS_KEY  = `gymsync_session_sets_${templateId}`;
+
   // Live exercises — mutable (swap changes this)
   const [liveExercises, setLiveExercises] = useState<LiveExercise[]>(initialExercises);
   const [currentExIdx, setCurrentExIdx] = useState(0);
-  const [loggedSets, setLoggedSets] = useState<LoggedSet[]>([]);
+
+  // Restore logged sets from sessionStorage on first mount
+  const [loggedSets, setLoggedSets] = useState<LoggedSet[]>(() => {
+    try {
+      const saved = ssGet(SETS_KEY);
+      return saved ? (JSON.parse(saved) as LoggedSet[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [rir, setRir] = useState("");
@@ -254,16 +280,37 @@ export function LiveSessionClient({
   // Swap modal
   const [swapModalOpen, setSwapModalOpen] = useState(false);
 
-  // Elapsed timer
+  // ── Elapsed timer — persisted via sessionStorage start timestamp ──
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef(0);
+
   useEffect(() => {
+    // Read or create the session start timestamp
+    let startTs = parseInt(ssGet(START_KEY) ?? "", 10);
+    if (isNaN(startTs)) {
+      startTs = Date.now();
+      ssSet(START_KEY, String(startTs));
+    }
+
+    // Immediately sync elapsed (handles the refresh case)
+    const initial = Math.floor((Date.now() - startTs) / 1000);
+    elapsedRef.current = initial;
+    setElapsed(initial);
+
+    // Tick every second, always derived from the wall-clock diff
     const id = setInterval(() => {
-      elapsedRef.current += 1;
-      setElapsed(elapsedRef.current);
+      const now = Math.floor((Date.now() - startTs) / 1000);
+      elapsedRef.current = now;
+      setElapsed(now);
     }, 1000);
+
     return () => clearInterval(id);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Persist loggedSets to sessionStorage on every change ──
+  useEffect(() => {
+    ssSet(SETS_KEY, JSON.stringify(loggedSets));
+  }, [loggedSets]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rest timer
   const [restSeconds, setRestSeconds] = useState(0);
@@ -406,6 +453,9 @@ export function LiveSessionClient({
 
   async function handleFinish() {
     setSubmitting(true);
+    // Clean up sessionStorage — session is done
+    ssRemove(START_KEY);
+    ssRemove(SETS_KEY);
     const fd = new FormData();
     fd.append("template_id", templateId);
     fd.append("sets_json", JSON.stringify(loggedSets));
